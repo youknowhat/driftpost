@@ -58,6 +58,13 @@ button{font-family:inherit; color:inherit;}
 }
 
 /* ---------- 레이아웃 ---------- */
+#app::before, #app::after{                       /* 밝은 하늘에서도 UI가 읽히도록 */
+  content:""; position:fixed; left:0; right:0; pointer-events:none; z-index:-1;
+}
+#app::before{top:0; height:96px;
+  background:linear-gradient(180deg, rgba(10,8,20,.78), rgba(10,8,20,0));}
+#app::after{bottom:0; height:150px;
+  background:linear-gradient(0deg, rgba(10,8,20,.62), rgba(10,8,20,0));}
 #app{
   position:relative; z-index:2; height:100%;
   display:flex; flex-direction:column;
@@ -164,7 +171,7 @@ button{font-family:inherit; color:inherit;}
 .btn.tiny{font-size:12px; padding:6px 10px;}
 .btn.wide{width:100%;}
 .iconbtn{
-  background:transparent; border:2px solid var(--line); color:#c3b0d2;
+  background:rgba(20,16,36,.72); border:2px solid var(--line); color:#d5c6e2;
   width:32px; height:30px; cursor:pointer; display:grid; place-items:center;
   font-family:"Silkscreen",monospace; font-size:12px; padding:0;
 }
@@ -615,13 +622,15 @@ const Ocean = (function(){
       const cy=Math.floor(hz*(0.12+k*0.13));
       const speed=(k%2?1:-1)*(2.0+k*0.9);
       const cx=((t*speed + k*211)%(W+180))-90;
-      const cw=Math.floor(W*(0.14+k*0.055)), ch=Math.max(2,Math.floor(H*0.018));
+      const cw=Math.floor(W*(0.13+k*0.05)), ch=Math.max(3,Math.floor(H*0.030));
       for(let y=cy;y<cy+ch;y++){
         for(let x=Math.floor(cx);x<cx+cw;x++){
-          const e=Math.min(1,Math.min(x-cx,cx+cw-x)/(cw*0.40));
+          const ex=Math.min(1,Math.min(x-cx,cx+cw-x)/(cw*0.30));
+          const ey=1-Math.abs((y-cy)/(ch/2)-1);
+          const e=Math.min(1,ex)*Math.max(0.25,ey);
           if(e<=0) continue;
-          if(BAYER[y&3][x&3]/16 < e*0.72)
-            put(img,x,y,mix(ramp(P.sky,y/hz),warm,0.34+0.24*e));
+          if(BAYER[y&3][x&3]/16 < e*1.05)
+            put(img,x,y,mix(ramp(P.sky,y/hz),warm,0.30+0.26*e));
         }
       }
     }
@@ -1801,11 +1810,19 @@ function tick(){
   }
 }
 
-/* ---------- 주기적 새로고침 ---------- */
+/* ---------- 주기적 새로고침 ----------
+   쓰던 편지를 지우지 않는다: 입력 중이면 화면을 다시 그리지 않는다. */
+function isTyping(){
+  const a=document.activeElement;
+  if(a && (a.tagName==="TEXTAREA"||a.tagName==="INPUT")) return true;
+  const ta=stage.querySelector("textarea");
+  return !!(ta && ta.value.trim());
+}
 async function poll(){
   try{
     await refresh();
     ctx._reloading=false;
+    if(isTyping()){ if(board&&board.registered&&!dock.hidden) paintDock(); return; }
     if(screen==="home") { viewHome(); }
     else if(screen==="voyage"){ if(findVoyage(ctx.id)) viewVoyage(); else go("home"); }
     else if(screen==="mine"){ viewMine(); }
@@ -1843,8 +1860,20 @@ async function boot(){
     return;
   }
 
-  try{ await refresh(); }
-  catch(e){ viewFatal(errMsg(e)); return; }
+  // 저장된 열쇠가 더 이상 통하지 않으면(만료·삭제) 조용히 새 열쇠를 만든다
+  async function reauth(){
+    try{ await sb.auth.signOut(); }catch(e){}
+    const {data,error}=await sb.auth.signInAnonymously();
+    if(error) throw error;
+    return refresh();
+  }
+  try{
+    const d=await refresh();
+    if(!d || d.ok===false) await reauth();
+  }catch(e){
+    try{ await reauth(); }
+    catch(e2){ viewFatal(errMsg(e2)); return; }
+  }
 
   // 소리 설정 복원 (자동재생은 첫 클릭 이후에만)
   if(load(LS.sound,"")==="1"){
