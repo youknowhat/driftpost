@@ -1,0 +1,1873 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>표류우체국</title>
+<meta name="description" content="종이 돛단배에 편지를 실어 바다에 띄웁니다. 편지는 두 항구 사이를 진짜 배의 속도로 건너갑니다.">
+<meta name="theme-color" content="#12101f">
+<meta property="og:title" content="표류우체국">
+<meta property="og:description" content="이름 모를 누군가에게 편지를 띄우고, 이름 모를 누군가의 편지를 건집니다. 편지는 바다를 건너는 시간만큼 걸려 도착합니다.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%2312101f'/%3E%3Cpath d='M6 2h1v8H6z' fill='%23fff4e0'/%3E%3Cpath d='M7 3h1v1H7zM7 4h2v1H7zM7 5h3v1H7zM7 6h4v1H7zM7 7h5v1H7zM7 8h6v1H7zM7 9h7v1H7z' fill='%23ffd9a8'/%3E%3Cpath d='M2 11h12v1H2zM3 12h10v1H3zM4 13h8v1H4z' fill='%23fff4e0'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=Gowun+Dodum&family=Silkscreen:wght@400;700&display=swap">
+<style>
+/* ============================================================
+   표류우체국 — 노을 진 먼바다. 단 하나의 시각 세계로 못박은 픽셀 게임 화면.
+   팔레트는 시간대에 따라 하늘만 바뀌고, UI 색은 고정된다.
+   ============================================================ */
+:root{
+  --abyss:#12101f;  --night:#241d3a;  --dusk:#4a3560;   --mauve:#7d5578;
+  --rose:#c06b7e;   --coral:#ef8f6d;  --amber:#ffb066;  --sand:#ffd9a8;
+  --paper:#fff4e0;  --paper-2:#f0dfc2;
+  --teal-d:#14384a; --teal:#2f6f7d;   --foam:#7fc2bd;
+  --ink:#2b2233;    --ink-soft:#5d4f63;
+  --danger:#e0705f;
+
+  --panel:#1c1730;
+  --panel-2:#251d3c;
+  --line:#5a4374;
+  --line-hi:#8c6aa8;
+
+  --px:3px;                       /* 픽셀 테두리 두께 */
+  --fs-label:11px;
+  --shadow: 0 var(--px) 0 0 #0c0a16, 0 0 0 var(--px) #0c0a16;
+}
+*{box-sizing:border-box;}
+[hidden]{display:none !important;}
+html,body{height:100%;}
+body{
+  margin:0; background:var(--abyss); color:var(--sand);
+  font-family:"Gowun Dodum","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  -webkit-font-smoothing:antialiased; overflow:hidden;
+  -webkit-tap-highlight-color:transparent;
+}
+button{font-family:inherit; color:inherit;}
+
+/* ---------- 배경 바다 ---------- */
+#sea{
+  position:fixed; inset:0; width:100%; height:100%;
+  image-rendering:pixelated; image-rendering:crisp-edges;
+  z-index:0; display:block; background:var(--abyss);
+}
+#vignette{
+  position:fixed; inset:0; z-index:1; pointer-events:none;
+  background:radial-gradient(ellipse 120% 85% at 50% 45%, rgba(0,0,0,0) 40%, rgba(8,6,16,.55) 100%);
+}
+
+/* ---------- 레이아웃 ---------- */
+#app{
+  position:relative; z-index:2; height:100%;
+  display:flex; flex-direction:column;
+  padding:calc(10px + env(safe-area-inset-top)) 12px calc(10px + env(safe-area-inset-bottom));
+  gap:10px;
+}
+.topbar{
+  display:flex; align-items:center; gap:8px; flex:0 0 auto;
+  max-width:960px; width:100%; margin:0 auto;
+}
+.brand{display:flex; align-items:center; gap:8px; min-width:0;}
+.brand-mark{width:22px; height:22px; flex:0 0 auto;}
+.brand-name{
+  font-family:"Do Hyeon",sans-serif; font-size:17px; letter-spacing:.06em;
+  color:var(--paper); text-shadow:2px 2px 0 #0c0a16; white-space:nowrap;
+}
+.port-chip{
+  font-family:"Silkscreen",monospace; font-size:var(--fs-label);
+  color:var(--foam); letter-spacing:.04em; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; min-width:0;
+}
+.port-chip b{font-family:"Gowun Dodum",sans-serif; color:var(--sand); font-weight:400;}
+.spacer{flex:1 1 auto; min-width:4px;}
+
+.stage{
+  flex:1 1 auto; display:flex; align-items:center; justify-content:center;
+  min-height:0; overflow:hidden; padding:2px 0;
+}
+.stage > .win{max-height:100%; display:flex; flex-direction:column;}
+.win-body{overflow-y:auto; min-height:0;
+  scrollbar-width:thin; scrollbar-color:var(--line) transparent;}
+.win-body::-webkit-scrollbar{width:9px;}
+.win-body::-webkit-scrollbar-track{background:#150f24;}
+.win-body::-webkit-scrollbar-thumb{background:var(--line); border:2px solid #150f24;}
+
+.dock{
+  flex:0 0 auto; display:grid; grid-template-columns:1fr 1fr; gap:10px;
+  max-width:960px; width:100%; margin:0 auto;
+}
+@media (max-width:560px){ .dock{grid-template-columns:1fr;} }
+
+/* ---------- 픽셀 창 ---------- */
+.win{
+  background:rgba(26,21,44,.95); border:var(--px) solid var(--line);
+  box-shadow:var(--shadow); position:relative;
+}
+.win::before{ /* 안쪽 하이라이트 라인 */
+  content:""; position:absolute; inset:0; pointer-events:none;
+  border-top:1px solid rgba(255,255,255,.09); border-left:1px solid rgba(255,255,255,.06);
+}
+.win-title{
+  font-family:"Do Hyeon",sans-serif; font-size:14px; letter-spacing:.05em;
+  background:var(--line); color:var(--paper); padding:5px 10px;
+  display:flex; align-items:center; gap:8px; flex:0 0 auto;
+}
+.win-title .dotrow{display:flex; gap:3px; margin-left:auto;}
+.win-title .dotrow i{width:6px; height:6px; background:#0c0a16; display:block;}
+.win-body{padding:14px;}
+
+.card{ /* 하단 슬롯 */
+  background:rgba(26,21,44,.95); border:var(--px) solid var(--line); box-shadow:var(--shadow);
+  padding:11px 12px; display:flex; flex-direction:column; gap:7px; text-align:left;
+  width:100%; cursor:pointer; transition:transform .08s steps(2), background .12s;
+}
+.card:hover:not(:disabled){background:var(--panel-2); transform:translateY(-2px);}
+.card:active:not(:disabled){transform:translateY(1px);}
+.card:disabled{cursor:default; opacity:.72;}
+.card:focus-visible, button:focus-visible, a:focus-visible, textarea:focus-visible, input:focus-visible{
+  outline:var(--px) solid var(--amber); outline-offset:2px;
+}
+.card-head{
+  display:flex; align-items:center; gap:7px;
+  font-family:"Silkscreen",monospace; font-size:10px; letter-spacing:.1em;
+  color:var(--line-hi); text-transform:uppercase;
+}
+.card-head .ko{font-family:"Do Hyeon",sans-serif; font-size:13px; letter-spacing:.04em; color:var(--sand); text-transform:none;}
+.card-main{font-family:"Do Hyeon",sans-serif; font-size:15px; color:var(--paper); line-height:1.35;}
+.card-sub{font-size:12.5px; color:#b9a6c9; line-height:1.5;}
+.card.ready{border-color:var(--amber);}
+.card.ready .card-main{color:var(--amber);}
+.card.empty .card-main{color:var(--foam);}
+
+/* 슬롯 상태 점 */
+.pip{width:8px;height:8px;background:var(--line-hi);flex:0 0 auto;}
+.pip.on{background:var(--amber); animation:pip 1.4s steps(2,end) infinite;}
+.pip.sail{background:var(--foam);}
+@keyframes pip{50%{opacity:.25;}}
+
+/* ---------- 버튼 ---------- */
+.btn{
+  font-family:"Do Hyeon",sans-serif; font-size:14.5px; letter-spacing:.04em;
+  background:var(--line); color:var(--paper); border:var(--px) solid #0c0a16;
+  padding:10px 16px; cursor:pointer; box-shadow:0 var(--px) 0 0 #0c0a16;
+  transition:transform .06s steps(1), background .12s;
+}
+.btn:hover:not(:disabled){background:var(--line-hi);}
+.btn:active:not(:disabled){transform:translateY(var(--px)); box-shadow:0 0 0 0 #0c0a16;}
+.btn:disabled{opacity:.45; cursor:not-allowed;}
+.btn.primary{background:var(--amber); color:#3a2410;}
+.btn.primary:hover:not(:disabled){background:#ffc286;}
+.btn.ghost{background:transparent; border-color:var(--line); box-shadow:none; color:#c3b0d2;}
+.btn.ghost:hover:not(:disabled){background:var(--panel-2); color:var(--paper);}
+.btn.ghost:active:not(:disabled){transform:none;}
+.btn.tiny{font-size:12px; padding:6px 10px;}
+.btn.wide{width:100%;}
+.iconbtn{
+  background:transparent; border:2px solid var(--line); color:#c3b0d2;
+  width:32px; height:30px; cursor:pointer; display:grid; place-items:center;
+  font-family:"Silkscreen",monospace; font-size:12px; padding:0;
+}
+.iconbtn:hover{border-color:var(--line-hi); color:var(--paper);}
+.iconbtn[aria-pressed="true"]{border-color:var(--amber); color:var(--amber);}
+
+/* ---------- 타이포 ---------- */
+.label{
+  font-family:"Silkscreen",monospace; font-size:10px; letter-spacing:.14em;
+  color:var(--line-hi); text-transform:uppercase;
+}
+h1.title{
+  font-family:"Do Hyeon",sans-serif; font-size:clamp(26px,6vw,40px); margin:0;
+  color:var(--paper); letter-spacing:.1em; text-shadow:3px 3px 0 #0c0a16; text-wrap:balance;
+}
+.lede{font-size:14px; line-height:1.75; color:#d6c6e0; text-wrap:pretty;}
+.muted{font-size:12px; line-height:1.65; color:#9c8bad;}
+.hr{height:var(--px); background:var(--line); margin:14px 0; opacity:.6;}
+
+/* ---------- 편지지 ---------- */
+.paper{
+  background:var(--paper); color:var(--ink); padding:18px 18px 16px;
+  border:var(--px) solid #0c0a16; box-shadow:inset 0 0 0 1px var(--paper-2), 0 var(--px) 0 0 #0c0a16;
+  font-size:15px; line-height:1.95; white-space:pre-wrap; word-break:break-word;
+  background-image:repeating-linear-gradient(180deg, transparent 0 28px, rgba(43,34,51,.07) 28px 29px);
+}
+.paper.mine{background:#e9f0ee; box-shadow:inset 0 0 0 1px #d3e0dc, 0 var(--px) 0 0 #0c0a16;}
+.paper-meta{
+  display:flex; flex-wrap:wrap; gap:6px 12px; align-items:center;
+  font-family:"Silkscreen",monospace; font-size:10px; letter-spacing:.08em;
+  color:var(--ink-soft); margin-bottom:10px; text-transform:uppercase;
+}
+.paper-meta .ko{font-family:"Gowun Dodum",sans-serif; font-size:12px; letter-spacing:0; text-transform:none;}
+.keeper-badge{
+  display:inline-flex; align-items:center; gap:6px; background:#4a3560; color:var(--sand);
+  font-family:"Gowun Dodum",sans-serif; font-size:12px; line-height:1.5;
+  padding:7px 10px; border-left:var(--px) solid var(--amber); margin-bottom:10px;
+}
+
+textarea{
+  width:100%; background:var(--paper); color:var(--ink); border:var(--px) solid #0c0a16;
+  padding:14px; font-family:"Gowun Dodum",sans-serif; font-size:15px; line-height:1.9;
+  resize:vertical; min-height:180px; outline:none;
+  background-image:repeating-linear-gradient(180deg, transparent 0 28px, rgba(43,34,51,.07) 28px 29px);
+}
+input[type=text]{
+  width:100%; background:var(--panel-2); color:var(--paper); border:2px solid var(--line);
+  padding:9px 11px; font-family:"Do Hyeon",sans-serif; font-size:15px; outline:none;
+}
+input[type=text]:focus{border-color:var(--amber);}
+.counter{font-family:"Silkscreen",monospace; font-size:11px; color:var(--line-hi); letter-spacing:.06em;}
+.counter.warn{color:var(--amber);} .counter.over{color:var(--danger);}
+
+/* ---------- 항해 게이지 ---------- */
+.gauge{height:14px; background:#0c0a16; border:2px solid var(--line); position:relative; overflow:hidden;}
+.gauge i{position:absolute; inset:0 auto 0 0; background:var(--teal); display:block;}
+.gauge b{
+  position:absolute; top:0; bottom:0; width:8px; background:var(--paper);
+  transform:translateX(-4px); box-shadow:-2px 0 0 var(--foam);
+}
+.eta{font-family:"Silkscreen",monospace; font-size:13px; color:var(--amber); letter-spacing:.06em;}
+.stat-row{display:flex; flex-wrap:wrap; gap:6px 18px; align-items:baseline;}
+.stat{display:flex; flex-direction:column; gap:2px;}
+.stat .v{font-family:"Silkscreen",monospace; font-size:14px; color:var(--paper); letter-spacing:.03em; font-variant-numeric:tabular-nums;}
+.stat .k{font-family:"Silkscreen",monospace; font-size:9px; color:var(--line-hi); letter-spacing:.12em;}
+
+#strip{width:100%; height:auto; display:block; margin:0 auto; image-rendering:pixelated;
+  border:var(--px) solid #0c0a16; background:#141230;}
+#chart{width:100%; height:auto; display:block; margin:0 auto; image-rendering:pixelated;
+  border:2px solid var(--line); background:#0b1622; opacity:.92;}
+.ends{display:flex; justify-content:space-between; gap:10px; align-items:flex-start;}
+.ends > div{display:flex; flex-direction:column; gap:2px; min-width:0;}
+.ends .r{text-align:right; align-items:flex-end;}
+.ends .nm{font-family:"Do Hyeon",sans-serif; font-size:13px; color:var(--paper); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:40vw;}
+.ends .pt{font-family:"Gowun Dodum",sans-serif; font-size:11.5px; color:var(--foam); white-space:nowrap;}
+
+/* ---------- 항구 목록 ---------- */
+.portlist{max-height:230px; overflow-y:auto; border:2px solid var(--line); background:#160f26;}
+.portlist button{
+  display:flex; width:100%; text-align:left; gap:10px; align-items:baseline;
+  background:transparent; border:0; border-bottom:1px solid #2b2140; padding:9px 11px;
+  cursor:pointer; font-family:"Gowun Dodum",sans-serif; font-size:13.5px; color:var(--sand);
+}
+.portlist button:hover{background:var(--panel-2); color:var(--paper);}
+.portlist button .lat{font-family:"Silkscreen",monospace; font-size:9px; color:var(--line-hi); margin-left:auto; white-space:nowrap;}
+
+.seed-chips{display:flex; flex-wrap:wrap; gap:6px;}
+.seed-chips button{
+  background:var(--panel-2); border:2px solid var(--line); color:#c3b0d2;
+  font-family:"Gowun Dodum",sans-serif; font-size:12px; padding:5px 9px; cursor:pointer;
+}
+.seed-chips button:hover{border-color:var(--amber); color:var(--paper);}
+
+.row{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+.row.end{justify-content:flex-end;}
+.col{display:flex; flex-direction:column; gap:10px;}
+.panel-w{width:min(660px,100%);}
+.panel-narrow{width:min(480px,100%);}
+
+.toast{
+  position:fixed; left:50%; top:calc(52px + env(safe-area-inset-top)); transform:translateX(-50%);
+  background:var(--panel); border:var(--px) solid var(--amber); color:var(--paper);
+  font-family:"Do Hyeon",sans-serif; font-size:13.5px; padding:10px 16px; z-index:50;
+  box-shadow:var(--shadow); max-width:min(92vw,460px); text-align:center; line-height:1.5;
+}
+.toast.err{border-color:var(--danger);}
+
+.logitem{border:2px solid var(--line); background:#160f26; padding:10px 12px; display:flex; flex-direction:column; gap:5px;}
+
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
+
+@media (prefers-reduced-motion: reduce){
+  *{animation-duration:.001ms !important; transition-duration:.001ms !important;}
+}
+</style>
+</head>
+<body>
+<canvas id="sea" aria-hidden="true"></canvas>
+<div id="vignette" aria-hidden="true"></div>
+
+<div id="app">
+  <header class="topbar">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 16 16" aria-hidden="true" shape-rendering="crispEdges">
+        <path d="M6 2h1v8H6z" fill="#fff4e0"/>
+        <path d="M7 3h1v1H7zM7 4h2v1H7zM7 5h3v1H7zM7 6h4v1H7zM7 7h5v1H7zM7 8h6v1H7zM7 9h7v1H7z" fill="#ffd9a8"/>
+        <path d="M2 11h12v1H2zM3 12h10v1H3zM4 13h8v1H4z" fill="#fff4e0"/>
+      </svg>
+      <span class="brand-name">표류우체국</span>
+    </div>
+    <div class="port-chip" id="portChip"></div>
+    <div class="spacer"></div>
+    <button class="iconbtn" id="btnLog" title="항해일지" aria-label="항해일지">LOG</button>
+    <button class="iconbtn" id="btnAbout" title="이곳의 규칙" aria-label="이곳의 규칙">?</button>
+    <button class="iconbtn" id="btnSound" title="파도 소리" aria-label="파도 소리" aria-pressed="false">♪</button>
+  </header>
+
+  <main class="stage" id="stage"></main>
+
+  <div class="dock" id="dock" hidden>
+    <button class="card" id="slotOut"></button>
+    <button class="card" id="slotIn"></button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
+<script>
+/* ============================================================
+   표류우체국 — 클라이언트
+   ============================================================ */
+(function(){
+"use strict";
+
+const SUPABASE_URL = "https://blhwgdiuxdzngepotseo.supabase.co";
+const SUPABASE_KEY = "sb_publishable_NgVHDq30C1pVI10Rp8seVQ_XDwcxtNh";
+
+const SPEED_KMH = 37.04;          // 20노트 — 서버와 동일한 상수
+const MAX_LEN   = 500;
+const LS = {
+  sound:"dp.sound", nick:"dp.nick", port:"dp.port", seen:"dp.seen", block:"dp.block"
+};
+
+let sb = null, board = null, skewMs = 0, pollTimer = null, tickTimer = null;
+let screen = "boot", ctx = {};
+
+/* ---------- 유틸 ---------- */
+const $  = (s,r)=> (r||document).querySelector(s);
+const el = (t,c,txt)=>{ const n=document.createElement(t); if(c) n.className=c; if(txt!=null) n.textContent=txt; return n; };
+const esc = s => String(s).replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+const now = ()=> Date.now() + skewMs;              // 서버 시계에 맞춘 현재 시각
+const clamp=(v,a,b)=> v<a?a:v>b?b:v;
+
+function store(k,v){ try{ v===undefined ? localStorage.removeItem(k) : localStorage.setItem(k,v);}catch(e){} }
+function load(k,d){ try{ const v=localStorage.getItem(k); return v===null?d:v; }catch(e){ return d; } }
+
+function km(a,b,c,d){
+  const R=6371.0088, r=Math.PI/180;
+  const dLa=(c-a)*r, dLo=(d-b)*r;
+  const h=Math.sin(dLa/2)**2 + Math.cos(a*r)*Math.cos(c*r)*Math.sin(dLo/2)**2;
+  return R*2*Math.asin(Math.min(1,Math.sqrt(h)));
+}
+function fmtKm(v){ return Math.round(v).toLocaleString("ko-KR")+"km"; }
+function fmtDur(ms){
+  if(ms<0) ms=0;
+  const m=Math.floor(ms/60000), h=Math.floor(m/60), d=Math.floor(h/24);
+  if(d>0)  return d+"일 "+(h%24)+"시간";
+  if(h>0)  return h+"시간 "+(m%60)+"분";
+  if(m>0)  return m+"분";
+  return Math.ceil(ms/1000)+"초";
+}
+function fmtWhen(t){
+  const dt=new Date(t);
+  return dt.toLocaleString("ko-KR",{month:"long",day:"numeric",hour:"2-digit",minute:"2-digit"});
+}
+function toast(msg, isErr){
+  const old=$(".toast"); if(old) old.remove();
+  const t=el("div","toast"+(isErr?" err":""),msg);
+  t.setAttribute("role","status");
+  document.body.appendChild(t);
+  setTimeout(()=>{ t.style.opacity="0"; t.style.transition="opacity .4s"; setTimeout(()=>t.remove(),420); }, isErr?4200:2800);
+}
+
+/* ============================================================
+   1. 파도 소리 — 외부 파일 없이 합성한다
+   ============================================================ */
+const Sea = (function(){
+  let ac=null, master=null, on=false, ready=false, gullTimer=null, swellTimer=null;
+
+  function noiseBuffer(){
+    const len = ac.sampleRate*3;
+    const buf = ac.createBuffer(1,len,ac.sampleRate);
+    const d = buf.getChannelData(0);
+    let b0=0,b1=0,b2=0;
+    for(let i=0;i<len;i++){                    // 핑크에 가까운 노이즈
+      const w=Math.random()*2-1;
+      b0=0.99765*b0+w*0.0990460; b1=0.96300*b1+w*0.2965164; b2=0.57000*b2+w*1.0526913;
+      d[i]=(b0+b1+b2+w*0.1848)*0.22;
+    }
+    return buf;
+  }
+  function src(buf,gain){
+    const s=ac.createBufferSource(); s.buffer=buf; s.loop=true;
+    const g=ac.createGain(); g.gain.value=gain;
+    s.connect(g); return {s,g};
+  }
+  function build(){
+    const buf=noiseBuffer();
+    master=ac.createGain(); master.gain.value=0; master.connect(ac.destination);
+
+    // 깊은 물의 울림
+    const deep=src(buf,0.55);
+    const lp=ac.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=200; lp.Q.value=0.6;
+    deep.g.connect(lp); lp.connect(master); deep.s.start();
+
+    // 부서지는 파도 — 게인을 천천히 부풀렸다 줄인다
+    const surf=src(buf,0.0);
+    const bp=ac.createBiquadFilter(); bp.type="bandpass"; bp.frequency.value=680; bp.Q.value=0.55;
+    const hs=ac.createBiquadFilter(); hs.type="highshelf"; hs.frequency.value=2600; hs.gain.value=-9;
+    surf.g.connect(bp); bp.connect(hs); hs.connect(master); surf.s.start();
+
+    // 바람
+    const wind=src(buf,0.10);
+    const hp=ac.createBiquadFilter(); hp.type="highpass"; hp.frequency.value=1800;
+    wind.g.connect(hp); hp.connect(master); wind.s.start();
+    const wlfo=ac.createOscillator(); wlfo.frequency.value=0.035;
+    const wamp=ac.createGain(); wamp.gain.value=0.055;
+    wlfo.connect(wamp); wamp.connect(wind.g.gain); wlfo.start();
+
+    function swell(){
+      if(!ac) return;
+      const t=ac.currentTime;
+      const rise=1.6+Math.random()*1.9, hold=0.5+Math.random()*0.9, fall=2.4+Math.random()*2.6;
+      const peak=0.20+Math.random()*0.22;
+      surf.g.gain.cancelScheduledValues(t);
+      surf.g.gain.setValueAtTime(surf.g.gain.value,t);
+      surf.g.gain.linearRampToValueAtTime(peak, t+rise);
+      surf.g.gain.linearRampToValueAtTime(peak*0.82, t+rise+hold);
+      surf.g.gain.linearRampToValueAtTime(0.035, t+rise+hold+fall);
+      bp.frequency.cancelScheduledValues(t);
+      bp.frequency.setValueAtTime(bp.frequency.value,t);
+      bp.frequency.linearRampToValueAtTime(430+Math.random()*520, t+rise);
+      swellTimer=setTimeout(swell,(rise+hold+fall+0.7+Math.random()*2.4)*1000);
+    }
+    swell();
+
+    function gull(){
+      gullTimer=setTimeout(()=>{
+        if(ac && on && Math.random()<0.55){
+          const n=1+Math.floor(Math.random()*3);
+          for(let i=0;i<n;i++) cry(ac.currentTime + i*(0.3+Math.random()*0.22));
+        }
+        gull();
+      }, 42000+Math.random()*70000);
+    }
+    function cry(t){
+      const o=ac.createOscillator(), g=ac.createGain(), f=ac.createBiquadFilter();
+      o.type="triangle"; f.type="bandpass"; f.frequency.value=1500; f.Q.value=3;
+      const base=980+Math.random()*420;
+      o.frequency.setValueAtTime(base,t);
+      o.frequency.exponentialRampToValueAtTime(base*1.7,t+0.07);
+      o.frequency.exponentialRampToValueAtTime(base*0.72,t+0.24);
+      g.gain.setValueAtTime(0,t);
+      g.gain.linearRampToValueAtTime(0.020,t+0.05);
+      g.gain.exponentialRampToValueAtTime(0.0006,t+0.30);
+      o.connect(f); f.connect(g); g.connect(master); o.start(t); o.stop(t+0.34);
+    }
+    gull();
+    ready=true;
+  }
+
+  function fade(to,sec){
+    if(!master) return;
+    const t=ac.currentTime;
+    master.gain.cancelScheduledValues(t);
+    master.gain.setValueAtTime(master.gain.value,t);
+    master.gain.linearRampToValueAtTime(to,t+sec);
+  }
+  return {
+    get on(){ return on; },
+    async toggle(force){
+      const want = force===undefined ? !on : force;
+      if(want){
+        if(!ac){ const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return false; ac=new AC(); }
+        if(ac.state==="suspended") await ac.resume();
+        if(!ready) build();
+        on=true; fade(0.22,3.5);
+      }else{
+        on=false; fade(0,0.7);
+      }
+      store(LS.sound, on?"1":"0");
+      const b=$("#btnSound"); if(b){ b.setAttribute("aria-pressed",String(on)); b.textContent = on?"♪":"✕"; }
+      return on;
+    },
+    /* 종이 접히는 소리 — 배를 띄울 때 한 번 */
+    paper(){
+      if(!ac||!on) return;
+      const t=ac.currentTime, len=Math.floor(ac.sampleRate*0.22);
+      const b=ac.createBuffer(1,len,ac.sampleRate), d=b.getChannelData(0);
+      for(let i=0;i<len;i++){ d[i]=(Math.random()*2-1)*Math.pow(1-i/len,3.2); }
+      const s=ac.createBufferSource(); s.buffer=b;
+      const f=ac.createBiquadFilter(); f.type="bandpass"; f.frequency.value=2600; f.Q.value=0.9;
+      const g=ac.createGain(); g.gain.value=0.16;
+      s.connect(f); f.connect(g); g.connect(master); s.start(t);
+    }
+  };
+})();
+
+/* ============================================================
+   2. 픽셀 바다 — 시간대에 따라 하늘이 바뀐다
+   ============================================================ */
+const Ocean = (function(){
+  const cv=$("#sea"), c=cv.getContext("2d",{alpha:false});
+  let W=0,H=0,PX=3,t0=performance.now();
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const BAYER=[[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]];
+
+  // 시간대별 하늘/바다 램프 (위→아래). warm = 수평선에 걸리는 따뜻한 띠.
+  const SKIES={
+    dawn:{ sky:["#1f1c38","#3b2d55","#6d4a70","#a95f77","#e08a6f","#ffc48a"],
+           sea:["#4a6076","#3a4c62","#2c3a4e","#20293a","#161d2a"],
+           sun:"#fff1cf", glow:"#ff9e6b", warm:"#ffb277", sunY:-0.022 },
+    day:{  sky:["#3f79a6","#5e97bd","#84b6d2","#a9cfe0","#c9e3ea","#e8f2f1"],
+           sea:["#3a8791","#31727e","#28606c","#1f4d59","#183c47"],
+           sun:"#fffaf0", glow:"#dcefef", warm:"#f4e2bd", sunY:-0.36 },
+    dusk:{ sky:["#2b1f3f","#54365f","#8a4f72","#c86a76","#f28f66","#ffc07a"],
+           sea:["#6b5570","#54455c","#3f3549","#2c2637","#1d1a27"],
+           sun:"#ffe6b0", glow:"#ff9d5c", warm:"#ffab63", sunY:-0.030 },
+    night:{sky:["#0b0a17","#12101f","#191630","#231d3c","#33284f","#4d3a63"],
+           sea:["#2c2f4a","#22253b","#1a1c2e","#131522","#0d0f19"],
+           sun:"#f5e8c9", glow:"#6f5a86", warm:"#a67a7a", sunY:-0.20 }
+  };
+  let phase="dusk";
+  const forced=(new URLSearchParams(location.search).get("sky")||"").toLowerCase();
+  function pickPhase(){
+    if(SKIES[forced]) return forced;
+    const h=new Date().getHours();
+    if(h>=5 && h<8)   return "dawn";
+    if(h>=8 && h<16)  return "day";
+    if(h>=16 && h<20) return "dusk";
+    return "night";
+  }
+
+  function hex(h){ return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]; }
+  function mix(a,b,t){ return [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t]; }
+  function ramp(cols,t){
+    const n=cols.length-1, i=clamp(Math.floor(t*n),0,n-1);
+    return mix(hex(cols[i]),hex(cols[i+1]), clamp(t*n-i,0,1));
+  }
+  function put(img,x,y,rgb){
+    if(x<0||y<0||x>=W||y>=H) return;
+    const o=(y*W+x)*4;
+    img.data[o]=rgb[0]|0; img.data[o+1]=rgb[1]|0; img.data[o+2]=rgb[2]|0; img.data[o+3]=255;
+  }
+
+  // 종이 돛단배 스프라이트 (#=밝은 종이, +=그늘, |=접힌 선)
+  const BOAT=[
+    "...O..............",
+    "...OHO............",
+    "...OHHO...........",
+    "...OHHHO..........",
+    "...OHHHHO.........",
+    "...OSHHHHO........",
+    "...OSSHHHHO.......",
+    "...OSSSHHHHO......",
+    "...OSSSSHHHHO.....",
+    "...OSSSSSHHHHO....",
+    "...OSSSSSSHHHHO...",
+    "...OOOOOOOOOOOOO..",
+    "...OO.............",
+    ".OOOOOOOOOOOOOOOO.",
+    "OHHHHHHHHHHHHHHHHO",
+    "OSSSSSSSSSSSSSSSSO",
+    ".OOSSSSSSSSSSSSOO.",
+    "..OOOOOOOOOOOOOO.."
+  ];
+
+  function resize(){
+    const dpr=1;
+    PX = innerWidth<520 ? 3 : (innerWidth<1100 ? 3 : 4);
+    W=Math.ceil(innerWidth/PX); H=Math.ceil(innerHeight/PX);
+    cv.width=W; cv.height=H;
+    cv.style.width="100%"; cv.style.height="100%";
+    c.imageSmoothingEnabled=false;
+  }
+
+  function draw(ts){
+    const t=(ts-t0)/1000;
+    const P=SKIES[phase];
+    const img=c.createImageData(W,H);
+    const hz=Math.floor(H*0.52);                       // 수평선
+    const seaH=Math.max(1,H-hz);
+
+    const sunX=Math.floor(W*0.80), sunR=Math.max(6,Math.floor(W*0.052));
+    const sunY=Math.floor(hz + H*P.sunY - sunR*0.2);
+    const glow=hex(P.glow), sunC=hex(P.sun), warm=hex(P.warm);
+
+    /* ---- 하늘 ---- */
+    for(let y=0;y<hz;y++){
+      const tt=y/hz;
+      const base=ramp(P.sky,tt);
+      // 수평선에 가까울수록 따뜻해진다 — 먼 항구의 불빛
+      const hb=Math.pow(clamp(1-(hz-y)/(hz*0.34),0,1),1.7);
+      for(let x=0;x<W;x++){
+        let col=base;
+        if(hb>0) col=mix(col,warm,hb*0.42);
+        const dx=(x-sunX), dy=(y-sunY)*1.5, d=Math.sqrt(dx*dx+dy*dy);
+        if(d<sunR*8) col=mix(col,glow,Math.pow(clamp(1-d/(sunR*8),0,1),2.2)*0.78);
+        const bt=(BAYER[y&3][x&3]/16-0.5)*6;
+        col=[col[0]+bt,col[1]+bt,col[2]+bt];
+        if(d<sunR) col=sunC;
+        else if(d<sunR+1.4) col=mix(col,sunC,0.5);
+        put(img,x,y,col);
+      }
+    }
+    /* 별 */
+    if(phase==="night"||phase==="dawn"){
+      const n=phase==="night"?110:38;
+      for(let i=0;i<n;i++){
+        const sx=Math.floor((Math.sin(i*97.13)*0.5+0.5)*W);
+        const sy=Math.floor((Math.sin(i*41.77)*0.5+0.5)*hz*0.78);
+        const tw=0.55+0.45*Math.sin(t*1.1+i);
+        if(tw>0.60) put(img,sx,sy,mix(ramp(P.sky,sy/hz),hex("#fff4e0"),tw*0.9));
+      }
+    }
+    /* 구름 — 디더링된 띠 */
+    for(let k=0;k<5;k++){
+      const cy=Math.floor(hz*(0.12+k*0.13));
+      const speed=(k%2?1:-1)*(2.0+k*0.9);
+      const cx=((t*speed + k*211)%(W+180))-90;
+      const cw=Math.floor(W*(0.14+k*0.055)), ch=Math.max(2,Math.floor(H*0.018));
+      for(let y=cy;y<cy+ch;y++){
+        for(let x=Math.floor(cx);x<cx+cw;x++){
+          const e=Math.min(1,Math.min(x-cx,cx+cw-x)/(cw*0.40));
+          if(e<=0) continue;
+          if(BAYER[y&3][x&3]/16 < e*0.72)
+            put(img,x,y,mix(ramp(P.sky,y/hz),warm,0.34+0.24*e));
+        }
+      }
+    }
+
+    /* ---- 수평선 ---- */
+    for(let x=0;x<W;x++){
+      put(img,x,hz,mix(ramp(P.sea,0),warm,0.60));
+      put(img,x,hz+1,mix(ramp(P.sea,0),warm,0.26));
+    }
+
+    /* ---- 바다 : 원근이 들어간 파도 층 ----
+       먼 곳일수록 얇고 촘촘하게, 가까울수록 두껍고 크게 출렁인다.
+       층을 먼 쪽부터 앞으로 덮어 그리므로 빈틈이 생기지 않는다. */
+    const NB=20, top=hz+2, seaBody=Math.max(1,H-top);
+    const foam=hex("#e8f7f0");
+    function bandTop(k,x){
+      const kk=k/NB;
+      const y=top+seaBody*Math.pow(kk,1.9);
+      const amp=0.5+kk*kk*8.0;
+      const f=0.21-kk*0.128;
+      const s=0.30+kk*1.55;
+      return y + Math.sin(x*f + t*s + k*2.13)*amp
+               + Math.sin(x*f*0.47 - t*s*0.55 + k*1.31)*amp*0.42;
+    }
+    for(let k=0;k<NB;k++){
+      const kk=k/NB;
+      const base =ramp(P.sea,kk);
+      const crest=mix(base,sunC,0.13+0.06*kk);
+      const lip  =mix(base,crest,0.45);
+      const trough=mix(base,[0,0,0],0.09+0.15*kk);
+      const f=0.21-kk*0.128, s=0.30+kk*1.55;
+      const thick=1+Math.round(kk*1.6);
+      for(let x=0;x<W;x++){
+        let ya=Math.round(bandTop(k,x));
+        let yb=(k===NB-1) ? H : Math.round(bandTop(k+1,x));
+        if(ya<top) ya=top;
+        if(yb<=ya) yb=ya+1;
+        // 이 지점이 파도 마루인가
+        const wv=Math.sin(x*f + t*s + k*2.13);
+        const isFoam = wv>0.90 && kk>0.20 && kk<0.92;
+        const near=1-clamp(Math.abs(x-sunX)/(W*0.045+kk*W*0.17),0,1);
+        for(let y=ya;y<yb && y<H;y++){
+          const off=y-ya;
+          let col = off<thick ? crest : off<thick*2 ? lip : base;
+          if(yb-y<=1 && kk>0.30) col=trough;
+          if(isFoam && off<thick) col=mix(col,foam,0.34+0.14*kk);
+          if(near>0){
+            const flick=(Math.sin(x*0.8+t*2.2+y*1.7)>0.05)?1:0;
+            col=mix(col,sunC,near*near*(0.24+0.40*flick)*(1-kk*0.42));
+          }
+          const bt=(BAYER[y&3][x&3]/16-0.5)*4.5*(0.35+kk);
+          put(img,x,y,[col[0]+bt,col[1]+bt,col[2]+bt]);
+        }
+      }
+    }
+
+    c.putImageData(img,0,0);
+
+    /* ---- 종이 돛단배 ---- */
+    if(ctx.showBoat!==false){
+      const bs=Math.max(2,Math.round(W/150));
+      const bw=BOAT[0].length*bs, bh=BOAT.length*bs;
+      const bx=clamp(Math.round(W*0.16 - bw/2 + Math.sin(t*0.17)*W*0.026), 2, W-bw-2);
+      const by=Math.round(hz + seaH*0.64 - bh + Math.sin(t*0.85)*bs*1.1);
+      const tilt=Math.sin(t*0.85+0.6);
+
+      // 항적 — 선체에 붙어 뒤로 흩어진다
+      c.fillStyle= phase==="day" ? "rgba(233,248,244,.6)" : "rgba(223,244,236,.42)";
+      for(let i=0;i<6;i++){
+        const wx=bx-(i+1)*3*bs + Math.sin(t*1.2+i*0.8)*bs*0.5;
+        const wy=by+bh-bs*1.5+Math.sin(t*1.5+i*1.1)*bs*0.4;
+        const len=Math.max(bs,(7-i)*bs*0.5);
+        c.fillRect(Math.round(wx),Math.round(wy),Math.round(len),Math.max(1,Math.round(bs*0.5)));
+      }
+
+      for(let r=0;r<BOAT.length;r++){
+        const sk=Math.round(tilt*(BOAT.length-r)/BOAT.length*1.5);
+        for(let q=0;q<BOAT[r].length;q++){
+          const ch=BOAT[r][q]; if(ch===".") continue;
+          c.fillStyle = ch==="H" ? "#fff6e6" : ch==="S" ? "#e3c8a2" : "#3a2f49";
+          c.fillRect(bx+q*bs+sk, by+r*bs, bs, bs);
+        }
+      }
+    }
+
+    if(!reduce) raf=requestAnimationFrame(draw);
+  }
+
+  let raf=null;
+  function start(){
+    phase=pickPhase(); resize();
+    addEventListener("resize",()=>{resize(); if(reduce) draw(performance.now());},{passive:true});
+    setInterval(()=>{ const p=pickPhase(); if(p!==phase) phase=p; }, 60000);
+    if(reduce) draw(performance.now()); else raf=requestAnimationFrame(draw);
+  }
+  return {start, get phase(){return phase;}};
+})();
+
+/* ============================================================
+   3. 픽셀 세계지도 — 항로를 그린다
+   ============================================================ */
+const MAP_W=120, MAP_H=60;
+const MAP_HEX="00000000000000000000000000000000000000000000000000000000000000000000007fc000000000000000000000000000ffe000fc0000000000000000000000fff800fc03e01c0000000000000000fffc000007fffffc000003fffe00007ffc003e07ffffffffe00ffffffe007ffc01fffffffffffffe0fffffff803fff03ffffffffffffff07fffff03c0ffc07cffffffffffff807effff03f000037cffffffffffff00001ffffff8000fbdfffffffffff800000ffffffc000ffffffffffffff8000007fffffe0003ffffffffffff10000003fffffe0001ffff3ffffffe00000003ffffc00007ffc33ffffffd80000003ffff8000079fff3fffffe300000001ffff000007cd3f3fffffc600000000fffe000007f81fffffff9e000000007ffc00000fffffffffff98000000003ffc00001fffff7fffff80000000003f9800001fffffdfffff00000000001f0e00003ffffff3fffe00000000000fe7c0003fffffe1fbf8000000000001e000003fffffc0f1f0c000000000007000003fffff00e0f0c0000000000039e0003fffff8040f0c0000000000005f8001fffff802060c0000000000003fe000f7fff80018300000000000007ff00001fff0000cfc0000000000007ffc0001ffe00006fdc000000000007fff0001ffc00007cdf000000000003fff8000ffc00001c0fc00000000001fff0000ffc0000001bc00000000001ffe0000fff0000007f000000000000ffe0000fff800000ff800000000000ffe0000fff800003ffc00000000000ffc0000ffb800007ffe00000000000ff800007f1800003ffe00000000000ff000007e0000003ffe00000000000fe000003c0000003ffe00000000000fc000003800000038fe04000000000f80000000000000003c07000000001f00000000000000000c0e000000001e00000000000000000c1c000000001e00000000000000000018000000001e00000000000000000000000000001e00000000000000000000000000000e00000000000000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+const LAND=(function(){
+  const bits=new Uint8Array(MAP_W*MAP_H);
+  const perRow=Math.ceil(MAP_W/4);
+  for(let r=0;r<MAP_H;r++){
+    const hexRow=MAP_HEX.substr(r*perRow,perRow);
+    for(let i=0;i<hexRow.length;i++){
+      const v=parseInt(hexRow[i],16);
+      for(let b=0;b<4;b++){
+        const x=i*4+b; if(x>=MAP_W) break;
+        bits[r*MAP_W+x] = (v>>(3-b)) & 1;
+      }
+    }
+  }
+  return bits;
+})();
+
+function ll2xyz(la,lo){ const r=Math.PI/180,a=la*r,b=lo*r,ca=Math.cos(a);
+  return [ca*Math.cos(b), ca*Math.sin(b), Math.sin(a)]; }
+function xyz2ll(v){ const d=Math.PI/180;
+  return [Math.asin(clamp(v[2],-1,1))/d, Math.atan2(v[1],v[0])/d]; }
+function greatCircle(a,b,n){
+  const p=ll2xyz(a[0],a[1]), q=ll2xyz(b[0],b[1]);
+  let dot=clamp(p[0]*q[0]+p[1]*q[1]+p[2]*q[2],-1,1);
+  const om=Math.acos(dot), s=Math.sin(om);
+  const out=[];
+  for(let i=0;i<=n;i++){
+    const t=i/n;
+    let v;
+    if(s<1e-8) v=p;
+    else{
+      const A=Math.sin((1-t)*om)/s, B=Math.sin(t*om)/s;
+      v=[p[0]*A+q[0]*B, p[1]*A+q[1]*B, p[2]*A+q[2]*B];
+    }
+    out.push(xyz2ll(v));
+  }
+  return out;
+}
+
+/* 항로 지도를 그린다. progress: 0~1 (없으면 배를 그리지 않음) */
+/* ---------- 세계 지도: 두 항구가 지구 어디쯤인지 ---------- */
+const MAP_R0=3, MAP_R1=51;                      // 위도 +81 ~ -69 만 그린다
+function drawChart(canvas, A, B, progress, dir){
+  const S=3, rows=MAP_R1-MAP_R0;
+  const w=MAP_W*S, h=rows*S;
+  canvas.width=w; canvas.height=h;
+  const g=canvas.getContext("2d"); g.imageSmoothingEnabled=false;
+
+  const night = Ocean.phase==="night" || Ocean.phase==="dawn";
+  const SEA=night?"#0b1622":"#0e2231", SEA2=night?"#122334":"#16344a";
+  const LANDC=night?"#2f2748":"#3b3157", LANDE=night?"#463b66":"#584a7a";
+
+  g.fillStyle=SEA; g.fillRect(0,0,w,h);
+  g.fillStyle=SEA2;
+  for(let r=MAP_R0;r<MAP_R1;r+=6) g.fillRect(0,(r-MAP_R0)*S,w,1);
+  for(let c=0;c<MAP_W;c+=10) g.fillRect(c*S,0,1,h);
+
+  for(let r=MAP_R0;r<MAP_R1;r++) for(let c=0;c<MAP_W;c++){
+    if(!LAND[r*MAP_W+c]) continue;
+    g.fillStyle=(r===0||!LAND[(r-1)*MAP_W+c])?LANDE:LANDC;
+    g.fillRect(c*S,(r-MAP_R0)*S,S,S);
+  }
+
+  const px = lo => ((lo+180)/360)*MAP_W*S;
+  const py = la => (((90-la)/180)*MAP_H - MAP_R0)*S;
+
+  const pts=greatCircle(A,B,120);
+  g.fillStyle="#7fc2bd";
+  let prev=null;
+  pts.forEach((p,i)=>{
+    const x=px(p[1]), y=py(p[0]);
+    if(prev!==null && Math.abs(x-prev)>w/2){ prev=x; return; }
+    prev=x;
+    if(i%2!==0) return;
+    g.fillRect(Math.round(x),Math.round(y),2,2);
+  });
+
+  function port(p,col){
+    const x=Math.round(px(p[1])), y=Math.round(py(p[0]));
+    g.fillStyle="#0c0a16"; g.fillRect(x-4,y-4,9,9);
+    g.fillStyle=col;       g.fillRect(x-2,y-2,5,5);
+    g.fillStyle="#0c0a16"; g.fillRect(x-1,y-1,3,3);
+  }
+  port(A,"#ffb066"); port(B,"#7fc2bd");
+
+  if(progress!=null){
+    const seq = dir==="BA" ? greatCircle(B,A,120) : pts;
+    const p=seq[clamp(Math.round(clamp(progress,0,1)*120),0,120)];
+    const x=Math.round(px(p[1])), y=Math.round(py(p[0]));
+    g.fillStyle="#0c0a16"; g.fillRect(x-3,y-6,8,9);
+    g.fillStyle="#fff4e0";
+    g.fillRect(x-1,y-5,2,5); g.fillRect(x+1,y-5,2,1);
+    g.fillRect(x+1,y-4,3,1); g.fillRect(x+1,y-3,3,1);
+    g.fillRect(x-2,y+1,7,2);
+  }
+}
+
+/* ---------- 항해 단면: 어느 거리든 읽히는 주 화면 ---------- */
+const LIGHTHOUSE=[
+  "..OOO..",
+  ".OLLLO.",
+  ".OHHHO.",
+  "..OOO..",
+  "..OHO..",
+  "..OSO..",
+  "..OHO..",
+  ".OHHHO.",
+  ".OSSSO.",
+  "OHHHHHO",
+  "OSSSSSO",
+  "OOOOOOO"
+];
+const MINIBOAT=[
+  "...O....",
+  "...OH...",
+  "...OHH..",
+  "...OHHH.",
+  "...OOOO.",
+  "OHHHHHHO",
+  ".OOOOOO."
+];
+function stampSprite(g,sp,x,y,s,cols){
+  for(let r=0;r<sp.length;r++) for(let q=0;q<sp[r].length;q++){
+    const ch=sp[r][q]; if(ch===".") continue;
+    g.fillStyle=cols[ch]||cols.H;
+    g.fillRect(x+q*s, y+r*s, s, s);
+  }
+}
+/* v: 항해, progress: 0~1 또는 null, dirBA: 배가 B→A 로 가는가 */
+function drawStrip(canvas, v, progress, dirBA){
+  const W=260, H=84, S=2;
+  canvas.width=W; canvas.height=H;
+  canvas.style.maxWidth=(W*3)+"px";
+  const g=canvas.getContext("2d"); g.imageSmoothingEnabled=false;
+
+  const night = Ocean.phase==="night";
+  const dawn  = Ocean.phase==="dawn";
+  const day   = Ocean.phase==="day";
+  const sky   = night?["#141230","#201c3c","#2e2450"] : dawn?["#2a2447","#6d4a70","#e08a6f"]
+              : day?["#4b86ad","#7aaecb","#b3d6e4"] : ["#3a2452","#8a4f72","#f0a06a"];
+  const seaC  = night?["#1b2036","#141827","#0e1120"] : day?["#2f7d86","#255f6b","#1b4855"]
+              : ["#4b4062","#372f4b","#241f33"];
+  const warm  = night?"#a2839b" : day?"#e9f3f2" : "#ffb877";
+  const hz=46;
+
+  for(let y=0;y<hz;y++){
+    const t=y/hz, n=sky.length-1, i=clamp(Math.floor(t*n),0,n-1);
+    const a=sky[i], b=sky[i+1], f=clamp(t*n-i,0,1);
+    const A2=[parseInt(a.slice(1,3),16),parseInt(a.slice(3,5),16),parseInt(a.slice(5,7),16)];
+    const B2=[parseInt(b.slice(1,3),16),parseInt(b.slice(3,5),16),parseInt(b.slice(5,7),16)];
+    g.fillStyle="rgb("+Math.round(A2[0]+(B2[0]-A2[0])*f)+","+Math.round(A2[1]+(B2[1]-A2[1])*f)+","+Math.round(A2[2]+(B2[2]-A2[2])*f)+")";
+    g.fillRect(0,y,W,1);
+  }
+  g.fillStyle=warm; g.fillRect(0,hz,W,1);
+  for(let y=hz+1;y<H;y++){
+    const d=(y-hz)/(H-hz);
+    g.fillStyle = d<0.34?seaC[0] : d<0.7?seaC[1] : seaC[2];
+    g.fillRect(0,y,W,1);
+  }
+  // 물결
+  g.fillStyle= night?"#2b3352" : day?"#4aa0a6" : "#6b5c80";
+  for(let k=0;k<7;k++){
+    const y=hz+5+k*5;
+    for(let x=(k*7)%12;x<W;x+=12) g.fillRect(x,y,5,1);
+  }
+
+  const LX=16, RX=W-16-7*S, ROUTE=hz+4;
+  const cols={O:"#2b2338",H:"#fff6e6",S:"#d9bd96",L:"#ffb066"};
+  const colsR={O:"#2b2338",H:"#e8fbf4",S:"#9ed3cb",L:"#7fc2bd"};
+  // 항구 아래 땅
+  g.fillStyle="#2b2338";
+  g.fillRect(LX-6,hz-1,7*S+12,4); g.fillRect(RX-6,hz-1,7*S+12,4);
+  stampSprite(g,LIGHTHOUSE,LX,hz-LIGHTHOUSE.length*S+1,S,cols);
+  stampSprite(g,LIGHTHOUSE,RX,hz-LIGHTHOUSE.length*S+1,S,colsR);
+
+  // 항로 점선
+  const x0=LX+7*S+4, x1=RX-4;
+  g.fillStyle="#8c7aa8";
+  for(let x=x0;x<x1;x+=5) g.fillRect(x,ROUTE+16,2,1);
+
+  // 거리 눈금
+  g.fillStyle="#6b5c80";
+  for(let i=1;i<4;i++){ const x=Math.round(x0+(x1-x0)*i/4); g.fillRect(x,ROUTE+13,1,4); }
+
+  if(progress!=null){
+    const t=clamp(progress,0,1);
+    const px2=Math.round(dirBA ? x1-(x1-x0)*t : x0+(x1-x0)*t);
+    const bob=Math.round(Math.sin(Date.now()/420)*1);
+    stampSprite(g,MINIBOAT,px2-8,ROUTE+2+bob,S,cols);
+  }
+  return {x0,x1};
+}
+
+/* ============================================================
+   4. 항구 — 좌표를 흐리게, 이름은 가장 가까운 항구로
+   ============================================================ */
+const PORTS=[
+ ["서울·인천",37.55,126.75],["부산",35.10,129.05],["제주",33.50,126.53],["대구",35.87,128.60],
+ ["광주",35.16,126.85],["대전",36.35,127.38],["강릉",37.75,128.88],["여수",34.76,127.66],
+ ["도쿄",35.68,139.69],["오사카",34.69,135.50],["삿포로",43.06,141.35],["후쿠오카",33.59,130.40],
+ ["오키나와",26.21,127.68],["타이베이",25.03,121.57],["홍콩",22.32,114.17],["마카오",22.20,113.55],
+ ["상하이",31.23,121.47],["베이징",39.90,116.41],["칭다오",36.07,120.38],["광저우",23.13,113.26],
+ ["다롄",38.91,121.61],["하얼빈",45.80,126.53],["울란바토르",47.89,106.91],
+ ["마닐라",14.60,120.98],["세부",10.32,123.89],["하노이",21.03,105.85],["호치민",10.82,106.63],
+ ["방콕",13.76,100.50],["푸껫",7.88,98.39],["싱가포르",1.35,103.82],["쿠알라룸푸르",3.14,101.69],
+ ["자카르타",-6.21,106.85],["발리",-8.65,115.22],["프놈펜",11.56,104.92],["양곤",16.87,96.20],
+ ["콜롬보",6.93,79.86],["뭄바이",19.08,72.88],["델리",28.61,77.21],["첸나이",13.08,80.27],
+ ["콜카타",22.57,88.36],["카트만두",27.72,85.32],["다카",23.81,90.41],["카라치",24.86,67.01],
+ ["두바이",25.20,55.27],["도하",25.29,51.53],["리야드",24.71,46.68],["테헤란",35.69,51.39],
+ ["이스탄불",41.01,28.98],["아테네",37.98,23.73],["텔아비브",32.08,34.78],["카이로",30.04,31.24],
+ ["타슈켄트",41.30,69.24],["알마티",43.24,76.89],["블라디보스토크",43.12,131.89],
+ ["모스크바",55.76,37.62],["상트페테르부르크",59.93,30.34],["헬싱키",60.17,24.94],
+ ["스톡홀름",59.33,18.07],["오슬로",59.91,10.75],["코펜하겐",55.68,12.57],["레이캬비크",64.15,-21.94],
+ ["베를린",52.52,13.40],["함부르크",53.55,9.99],["암스테르담",52.37,4.90],["브뤼셀",50.85,4.35],
+ ["파리",48.86,2.35],["마르세유",43.30,5.37],["런던",51.51,-0.13],["에든버러",55.95,-3.19],
+ ["더블린",53.35,-6.26],["리스본",38.72,-9.14],["포르투",41.15,-8.61],["마드리드",40.42,-3.70],
+ ["바르셀로나",41.39,2.17],["로마",41.90,12.50],["나폴리",40.85,14.27],["베네치아",45.44,12.32],
+ ["취리히",47.38,8.54],["빈",48.21,16.37],["프라하",50.08,14.44],["부다페스트",47.50,19.04],
+ ["바르샤바",52.23,21.01],["키이우",50.45,30.52],["부쿠레슈티",44.43,26.10],
+ ["카사블랑카",33.57,-7.59],["다카르",14.72,-17.47],["아크라",5.60,-0.19],["라고스",6.52,3.38],
+ ["나이로비",-1.29,36.82],["다르에스살람",-6.79,39.21],["케이프타운",-33.92,18.42],
+ ["더반",-29.86,31.02],["요하네스버그",-26.20,28.05],["안타나나리보",-18.88,47.51],
+ ["뉴욕",40.71,-74.01],["보스턴",42.36,-71.06],["워싱턴",38.91,-77.04],["마이애미",25.76,-80.19],
+ ["뉴올리언스",29.95,-90.07],["시카고",41.88,-87.63],["토론토",43.65,-79.38],["몬트리올",45.50,-73.57],
+ ["핼리팩스",44.65,-63.58],["밴쿠버",49.28,-123.12],["시애틀",47.61,-122.33],["포틀랜드",45.52,-122.68],
+ ["샌프란시스코",37.77,-122.42],["로스앤젤레스",34.05,-118.24],["샌디에이고",32.72,-117.16],
+ ["호놀룰루",21.31,-157.86],["앵커리지",61.22,-149.90],["덴버",39.74,-104.99],["휴스턴",29.76,-95.37],
+ ["멕시코시티",19.43,-99.13],["칸쿤",21.16,-86.85],["아바나",23.11,-82.37],["산후안",18.47,-66.11],
+ ["파나마시티",8.98,-79.52],["보고타",4.71,-74.07],["키토",-0.18,-78.47],["리마",-12.05,-77.04],
+ ["산티아고",-33.45,-70.67],["발파라이소",-33.05,-71.62],["부에노스아이레스",-34.60,-58.38],
+ ["몬테비데오",-34.90,-56.16],["상파울루",-23.55,-46.63],["리우데자네이루",-22.91,-43.17],
+ ["살바도르",-12.97,-38.50],["레시피",-8.05,-34.88],["우수아이아",-54.80,-68.30],
+ ["시드니",-33.87,151.21],["멜버른",-37.81,144.96],["브리즈번",-27.47,153.03],["퍼스",-31.95,115.86],
+ ["애들레이드",-34.93,138.60],["다윈",-12.46,130.84],["호바트",-42.88,147.33],
+ ["오클랜드",-36.85,174.76],["웰링턴",-41.29,174.78],["크라이스트처치",-43.53,172.64],
+ ["수바",-18.14,178.44],["포트모르즈비",-9.44,147.18],["누메아",-22.28,166.46],
+ ["타히티",-17.53,-149.57],["갈라파고스",-0.74,-90.31],["케이프타운 앞바다",-34.50,17.80]
+];
+function nearestPort(la,lo){
+  let best=null,bd=Infinity;
+  for(const p of PORTS){ const d=km(la,lo,p[1],p[2]); if(d<bd){bd=d;best=p;} }
+  return {name:best[0], dist:bd};
+}
+function portLabel(la,lo){
+  const n=nearestPort(la,lo);
+  if(n.dist<60)  return n.name;
+  if(n.dist<400) return n.name+" 근해";
+  return n.name+" 먼바다";
+}
+const coarse = v => Math.round(v/0.25)*0.25;
+
+/* 이름 짓기 */
+const ADJ=["고요한","다정한","늦은","이른","서툰","조용한","오래된","작은","먼","흐린","맑은","무던한","느린","깊은","낡은","따뜻한","무심한","씩씩한","게으른","성실한","어설픈","단단한"];
+const NOU=["등불","갈매기","뱃사공","나침반","돛","부표","파도","모래섬","안개","별자리","밀물","썰물","산호","조약돌","노을","뱃고동","해도","닻","물결","표류자","등대","선창"];
+const randNick=()=> ADJ[Math.floor(Math.random()*ADJ.length)]+" "+NOU[Math.floor(Math.random()*NOU.length)];
+
+/* ============================================================
+   5. 서버
+   ============================================================ */
+const ERRS={
+  "outbound slot busy":"이미 바다에 띄운 배가 있어요. 그 배의 항해가 끝나야 새 편지를 띄울 수 있습니다.",
+  "inbound slot busy":"이미 건져 올린 편지가 있어요. 한 번에 한 통만 품을 수 있습니다.",
+  "not registered":"항구를 먼저 정해주세요.",
+  "no session":"연결이 끊겼어요. 새로고침해 주세요.",
+  "not your turn":"지금은 답장할 차례가 아니에요.",
+  "still sailing":"편지가 아직 항해 중이에요.",
+  "voyage closed":"이미 마친 항해입니다.",
+  "already replied":"이미 답장을 보낸 편지예요.",
+  "not yours":"내 항해가 아니에요.",
+  "bad body":"편지는 1자 이상 500자 이하여야 합니다."
+};
+function errMsg(e){
+  const raw=(e && (e.message||e.hint||"")) || "";
+  for(const k in ERRS) if(raw.indexOf(k)>=0) return ERRS[k];
+  if(/fetch|network|Failed/i.test(raw)) return "바다가 잠시 멀어졌어요. 잠시 뒤 다시 시도해 주세요.";
+  return "문제가 생겼어요: "+raw;
+}
+async function rpc(fn,args){
+  const {data,error}=await sb.rpc(fn,args||{});
+  if(error) throw error;
+  return data;
+}
+async function refresh(){
+  const d=await rpc("dp_board");
+  if(d && d.now){ skewMs = new Date(d.now).getTime() - Date.now(); }
+  board=d;
+  return d;
+}
+
+/* ============================================================
+   6. 화면
+   ============================================================ */
+const stage=$("#stage"), dock=$("#dock"), slotOut=$("#slotOut"), slotIn=$("#slotIn");
+
+function win(title, bodyNode, cls){
+  const w=el("div","win "+(cls||"panel-w"));
+  const t=el("div","win-title"); t.appendChild(el("span",null,title));
+  const dr=el("div","dotrow"); dr.appendChild(el("i")); dr.appendChild(el("i")); dr.appendChild(el("i"));
+  t.appendChild(dr); w.appendChild(t);
+  const b=el("div","win-body"); b.appendChild(bodyNode); w.appendChild(b);
+  return w;
+}
+function show(node){ stage.innerHTML=""; stage.appendChild(node); stage.scrollTop=0; }
+function go(s,c){ screen=s; ctx=Object.assign({},c||{}); render(); }
+
+/* ---------- 인트로 ---------- */
+function viewIntro(){
+  dock.hidden=true; ctx.showBoat=true;
+  const b=el("div","col");
+  b.innerHTML=`
+    <div class="label">A POST OFFICE ADRIFT</div>
+    <h1 class="title">표류우체국</h1>
+    <p class="lede">종이를 접어 만든 돛단배에 편지를 실어 바다에 띄웁니다.<br>
+      그 배는 오래 떠다니다가, 어딘가의 낯선 사람에게 발견됩니다.</p>
+    <p class="lede">편지는 <b style="color:var(--amber)">진짜 배의 속도</b>로 항해합니다.
+      두 항구가 멀수록 더 오래 걸려요. 하루가 걸릴 수도, 열흘이 걸릴 수도 있습니다.
+      그 기다림까지가 이 우체국의 일입니다.</p>
+    <div class="hr"></div>
+    <p class="muted">로그인은 없습니다. 이름도, 얼굴도 묻지 않아요.<br>
+      필요한 건 당신이 어느 바다에 서 있는지, 그것 하나입니다.</p>
+  `;
+  const row=el("div","row");
+  const go1=el("button","btn primary","바다로 나가기");
+  go1.onclick=async()=>{ await Sea.toggle(true); startPort(); };
+  const q=el("button","btn ghost","이곳의 규칙 먼저 보기");
+  q.onclick=()=>go("about",{back:"intro"});
+  row.appendChild(go1); row.appendChild(q);
+  b.appendChild(row);
+  show(win("표류우체국 · DRIFTPOST", b));
+}
+
+/* ---------- 항구 정하기 ---------- */
+function startPort(){ go("port",{}); }
+function viewPort(){
+  dock.hidden=true; ctx.showBoat=true;
+  const b=el("div","col");
+  const head=el("div","col");
+  head.innerHTML=`
+    <div class="label">STEP 1 · YOUR PORT</div>
+    <h1 class="title" style="font-size:clamp(21px,4.6vw,28px)">당신의 항구는 어디인가요?</h1>
+    <p class="lede">편지가 바다를 건너는 시간을 재려면, 두 항구 사이의 거리를 알아야 합니다.
+      그래서 딱 한 가지, 대략의 위치만 여쭙니다.</p>
+    <p class="muted">정확한 좌표는 저장하지 않습니다. 약 25km 격자로 반올림한 값만 남고,
+      다른 사람에게는 좌표 대신 <b>가장 가까운 항구 이름</b>만 보입니다.</p>`;
+  b.appendChild(head);
+
+  const status=el("p","lede"); status.style.minHeight="24px"; b.appendChild(status);
+
+  const row=el("div","row");
+  if(board && board.registered){
+    const cancel=el("button","btn ghost","그대로 두기");
+    cancel.onclick=()=>go("home");
+    row.appendChild(cancel);
+  }
+  const gps=el("button","btn primary","현재 위치로 정하기");
+  gps.onclick=()=>{
+    if(!navigator.geolocation){ status.textContent="이 브라우저는 위치를 알려줄 수 없어요. 아래에서 항구를 골라주세요."; return; }
+    gps.disabled=true; status.textContent="바다를 살피는 중…";
+    navigator.geolocation.getCurrentPosition(
+      p=>{ pick(coarse(p.coords.latitude), coarse(p.coords.longitude)); },
+      err=>{
+        gps.disabled=false;
+        status.textContent = err.code===1
+          ? "괜찮아요. 아래 목록에서 가까운 항구를 골라주세요."
+          : "위치를 알 수 없었어요. 아래에서 골라주세요.";
+      },
+      {enableHighAccuracy:false, timeout:12000, maximumAge:600000}
+    );
+  };
+  row.appendChild(gps);
+  b.appendChild(row);
+
+  b.appendChild(el("div","hr"));
+  const lbl=el("div","label","OR CHOOSE A PORT · 목록에서 고르기"); b.appendChild(lbl);
+  const search=document.createElement("input");
+  search.type="text"; search.placeholder="항구 이름으로 찾기 (예: 부산, 리스본)";
+  b.appendChild(search);
+  const list=el("div","portlist"); b.appendChild(list);
+
+  function paint(q){
+    list.innerHTML="";
+    const ql=(q||"").trim();
+    PORTS.filter(p=>!ql||p[0].indexOf(ql)>=0).slice(0,200).forEach(p=>{
+      const bt=el("button");
+      bt.appendChild(el("span",null,p[0]));
+      const co=el("span","lat", (p[1]>=0?"N":"S")+Math.abs(p[1]).toFixed(1)+" "+(p[2]>=0?"E":"W")+Math.abs(p[2]).toFixed(1));
+      bt.appendChild(co);
+      bt.onclick=()=>pick(coarse(p[1]),coarse(p[2]));
+      list.appendChild(bt);
+    });
+    if(!list.children.length) list.appendChild(el("div","muted","그 이름의 항구는 아직 없어요.")).style.padding="12px";
+  }
+  paint(""); search.oninput=()=>paint(search.value);
+
+  function pick(la,lo){ go("nick",{lat:la,lng:lo,port:portLabel(la,lo)}); }
+  show(win("항구 정하기 · SET YOUR PORT", b));
+}
+
+/* ---------- 이름 짓기 ---------- */
+function viewNick(){
+  dock.hidden=true; ctx.showBoat=true;
+  const b=el("div","col");
+  b.innerHTML=`
+    <div class="label">STEP 2 · YOUR NAME</div>
+    <h1 class="title" style="font-size:clamp(21px,4.6vw,28px)">뭐라고 불러드릴까요?</h1>
+    <p class="lede">본명은 필요 없습니다. 편지 끝에 적힐 이름이에요.</p>`;
+  const wrap=el("div","row");
+  const inp=document.createElement("input"); inp.type="text"; inp.maxLength=24;
+  inp.value=(board&&board.registered?board.sailor.nick:load(LS.nick,""))||randNick();
+  inp.style.flex="1 1 200px";
+  const dice=el("button","btn ghost","다시 짓기"); dice.onclick=()=>{ inp.value=randNick(); };
+  wrap.appendChild(inp); wrap.appendChild(dice);
+  b.appendChild(wrap);
+
+  const info=el("p","muted");
+  info.innerHTML=`당신의 항구 · <b style="color:var(--sand)">${esc(ctx.port)}</b>`;
+  b.appendChild(info);
+
+  const row=el("div","row end");
+  const back=el("button","btn ghost","항구 다시 고르기"); back.onclick=()=>go("port");
+  const ok=el("button","btn primary","바다에 이름 걸기");
+  ok.onclick=async()=>{
+    const nick=inp.value.trim()||randNick();
+    ok.disabled=true; ok.textContent="등록 중…";
+    try{
+      await rpc("dp_register",{p_nick:nick,p_lat:ctx.lat,p_lng:ctx.lng,p_port:ctx.port});
+      const label=ctx.port;
+      store(LS.nick,nick); store(LS.port,label);
+      await refresh(); go("home");
+      toast("항구가 정해졌어요 · "+label);
+    }catch(e){ ok.disabled=false; ok.textContent="바다에 이름 걸기"; toast(errMsg(e),true); }
+  };
+  row.appendChild(back); row.appendChild(ok);
+  b.appendChild(row);
+  show(win("이름 짓기 · YOUR NAME", b));
+}
+
+/* ---------- 홈 ---------- */
+function outboundState(){
+  if(!board||!board.registered) return {kind:"none"};
+  const v=(board.voyages||[]).find(x=>x.side==="A");
+  if(v) return {kind:"voyage", v};
+  if(board.boat) return {kind:"drifting", boat:board.boat};
+  return {kind:"empty"};
+}
+function inboundState(){
+  if(!board||!board.registered) return {kind:"none"};
+  const v=(board.voyages||[]).find(x=>x.side==="B");
+  if(v) return {kind:"voyage", v};
+  return {kind:"empty"};
+}
+function voyageStage(v){
+  const letters=v.letters||[], p=v.pending;
+  if(p && !p.mine) return {code:"incoming", at:new Date(p.arrives_at).getTime(), from:new Date(p.sent_at).getTime()};
+  if(p && p.mine)  return {code:"outgoing", at:new Date(p.arrives_at).getTime(), from:new Date(p.sent_at).getTime()};
+  if(v.my_turn)    return {code:"toread"};
+  if(letters.length && letters[letters.length-1].mine) return {code:"waiting"};
+  return {code:"toread"};
+}
+
+function viewHome(){
+  dock.hidden=false; ctx.showBoat=true;
+  const b=el("div","col");
+  const s=board.stats||{};
+  const peek=board.peek||0;
+
+  const hero=el("div","col");
+  const greet = Ocean.phase==="night" ? "밤바다입니다."
+              : Ocean.phase==="dawn"  ? "동이 트는 중입니다."
+              : Ocean.phase==="day"   ? "해가 높습니다."
+              :                          "노을이 지고 있습니다.";
+  hero.innerHTML=`
+    <div class="label">${esc(board.sailor.port)}</div>
+    <h1 class="title" style="font-size:clamp(20px,4.4vw,27px)">${esc(greet)}</h1>
+    <p class="lede">${peek>0
+      ? '수평선 쪽에 뭔가 떠 있습니다. <b style="color:var(--amber)">건질 수 있는 배가 '+peek+'척</b> 있어요.'
+      : '지금 이 항구에 닿은 배는 없습니다. 편지를 띄워 두면, 언젠가 누군가 건져 올릴 거예요.'}</p>`;
+  b.appendChild(hero);
+
+  const st=el("div","stat-row"); st.style.marginTop="4px";
+  [["DRIFTING",(s.drifting||0)+"척","떠 있는 배"],
+   ["SAILING",(s.sailing||0)+"통","항해 중인 편지"],
+   ["SAILORS",(s.sailors||0)+"명","이 바다의 사람"]].forEach(([k,v,ko])=>{
+    const d=el("div","stat");
+    d.appendChild(el("div","v",v));
+    d.appendChild(el("div","k",k+" · "+ko));
+    st.appendChild(d);
+  });
+  b.appendChild(st);
+
+  show(win("항해 일지 · "+esc(board.sailor.nick), b));
+  paintDock();
+}
+
+function paintDock(){
+  const out=outboundState(), inb=inboundState();
+
+  /* 내가 띄운 배 */
+  slotOut.className="card"; slotOut.disabled=false; slotOut.innerHTML="";
+  const oh=el("div","card-head");
+  oh.appendChild(el("span","pip"));
+  oh.appendChild(el("span",null,"OUTBOUND"));
+  oh.appendChild(el("span","ko","내가 띄운 배"));
+  slotOut.appendChild(oh);
+
+  if(out.kind==="empty"){
+    slotOut.classList.add("empty");
+    slotOut.appendChild(el("div","card-main","편지 띄우기"));
+    slotOut.appendChild(el("div","card-sub","500자 안에 담아 바다로 보냅니다. 한 번에 한 척만요."));
+    slotOut.onclick=()=>go("compose");
+  }else if(out.kind==="drifting"){
+    const t0=new Date(out.boat.launched_at).getTime();
+    const hrs=(now()-t0)/3600000;
+    const reach=SPEED_KMH*hrs;
+    oh.querySelector(".pip").classList.add("sail");
+    slotOut.appendChild(el("div","card-main","표류 중"));
+    slotOut.appendChild(el("div","card-sub",
+      fmtDur(now()-t0)+"째 떠다니는 중 · 지금까지 "+fmtKm(reach)+" 밖까지 닿았어요"));
+    slotOut.onclick=()=>go("mine");
+  }else if(out.kind==="voyage"){
+    const g=voyageStage(out.v);
+    if(g.code==="incoming"){
+      oh.querySelector(".pip").classList.add("sail");
+      slotOut.appendChild(el("div","card-main","답장이 오는 중"));
+      slotOut.appendChild(el("div","card-sub",
+        esc(out.v.other_port)+"에서 출발 · 도착까지 "+fmtDur(g.at-now())));
+    }else if(g.code==="toread"){
+      slotOut.classList.add("ready");
+      oh.querySelector(".pip").classList.add("on");
+      slotOut.appendChild(el("div","card-main","답장이 도착했어요"));
+      slotOut.appendChild(el("div","card-sub",esc(out.v.other_nick)+" · "+esc(out.v.other_port)));
+    }else if(g.code==="outgoing"){
+      oh.querySelector(".pip").classList.add("sail");
+      slotOut.appendChild(el("div","card-main","내 편지가 항해 중"));
+      slotOut.appendChild(el("div","card-sub",
+        esc(out.v.other_port)+"까지 "+fmtDur(g.at-now())+" 남음"));
+    }else{
+      slotOut.appendChild(el("div","card-main","누군가 읽었습니다"));
+      slotOut.appendChild(el("div","card-sub",esc(out.v.other_port)+"의 "+esc(out.v.other_nick)+"이(가) 건져 올렸어요. 답장은 아직입니다."));
+    }
+    slotOut.onclick=()=>go("voyage",{id:out.v.id});
+  }else{
+    slotOut.disabled=true;
+    slotOut.appendChild(el("div","card-main","—"));
+  }
+
+  /* 내가 건진 배 */
+  slotIn.className="card"; slotIn.disabled=false; slotIn.innerHTML="";
+  const ih=el("div","card-head");
+  ih.appendChild(el("span","pip"));
+  ih.appendChild(el("span",null,"INBOUND"));
+  ih.appendChild(el("span","ko","내가 건진 배"));
+  slotIn.appendChild(ih);
+
+  if(inb.kind==="empty"){
+    const peek=board.peek||0;
+    if(peek>0){ slotIn.classList.add("ready"); ih.querySelector(".pip").classList.add("on"); }
+    else slotIn.classList.add("empty");
+    slotIn.appendChild(el("div","card-main", peek>0 ? "배를 건져 올리기" : "바다 살펴보기"));
+    slotIn.appendChild(el("div","card-sub", peek>0
+      ? "이 항구까지 실제로 항해해 온 배가 "+peek+"척 있어요."
+      : "아직 닿은 배가 없어요. 먼 곳의 배는 도착하는 데 며칠이 걸립니다."));
+    slotIn.onclick=doDiscover;
+  }else if(inb.kind==="voyage"){
+    const g=voyageStage(inb.v);
+    if(g.code==="toread"){
+      slotIn.classList.add("ready"); ih.querySelector(".pip").classList.add("on");
+      slotIn.appendChild(el("div","card-main","읽지 않은 편지"));
+      slotIn.appendChild(el("div","card-sub",esc(inb.v.other_nick)+" · "+esc(inb.v.other_port)+" · "+fmtKm(inb.v.distance_km)+" 밖"));
+    }else if(g.code==="outgoing"){
+      ih.querySelector(".pip").classList.add("sail");
+      slotIn.appendChild(el("div","card-main","내 답장이 항해 중"));
+      slotIn.appendChild(el("div","card-sub",esc(inb.v.other_port)+"까지 "+fmtDur(g.at-now())+" 남음"));
+    }else if(g.code==="incoming"){
+      ih.querySelector(".pip").classList.add("sail");
+      slotIn.appendChild(el("div","card-main","답장이 오는 중"));
+      slotIn.appendChild(el("div","card-sub","도착까지 "+fmtDur(g.at-now())));
+    }else{
+      slotIn.appendChild(el("div","card-main","답장을 기다리는 중"));
+      slotIn.appendChild(el("div","card-sub",esc(inb.v.other_port)+"의 답은 올 수도, 오지 않을 수도 있어요."));
+    }
+    slotIn.onclick=()=>go("voyage",{id:inb.v.id});
+  }else{
+    slotIn.disabled=true;
+    slotIn.appendChild(el("div","card-main","—"));
+  }
+}
+
+/* ---------- 편지 쓰기 ---------- */
+const SEEDS=[
+ "요즘 나는 …","오늘 겨우 해낸 일은 …","아무한테도 말 못 한 게 있는데 …",
+ "누가 이걸 좀 알아줬으면 해요. …","내가 요즘 자주 보는 풍경은 …","10년 뒤의 나에게 …",
+ "고맙다고 말하지 못한 사람이 있어요. …","지금 창밖은 …"
+];
+function viewCompose(){
+  dock.hidden=true; ctx.showBoat=true;
+  const b=el("div","col");
+  b.innerHTML=`
+    <div class="label">WRITE · 500자</div>
+    <p class="lede">누가 읽을지는 아무도 모릅니다. 그래서 더 솔직해도 괜찮아요.</p>`;
+
+  const ta=document.createElement("textarea");
+  ta.maxLength=MAX_LEN; ta.placeholder="바다 건너 누군가에게…";
+  ta.setAttribute("aria-label","편지 내용");
+  b.appendChild(ta);
+
+  const meta=el("div","row");
+  const cnt=el("span","counter","0 / "+MAX_LEN);
+  meta.appendChild(cnt);
+  b.appendChild(meta);
+
+  const seedWrap=el("div","col");
+  seedWrap.appendChild(el("div","label","첫 문장이 어렵다면"));
+  const chips=el("div","seed-chips");
+  SEEDS.forEach(s=>{ const c2=el("button",null,s); c2.onclick=()=>{ ta.value=(ta.value?ta.value+"\n":"")+s+" "; ta.focus(); upd(); }; chips.appendChild(c2); });
+  seedWrap.appendChild(chips);
+  b.appendChild(seedWrap);
+
+  const warn=el("p","muted");
+  warn.innerHTML="이름·연락처·계정처럼 당신을 특정할 수 있는 건 적지 말아 주세요. 모르는 사이라서 지킬 수 있는 것들이 있습니다.";
+  b.appendChild(warn);
+
+  const row=el("div","row end");
+  const back=el("button","btn ghost","돌아가기"); back.onclick=()=>go("home");
+  const send=el("button","btn primary","바다에 띄우기"); send.disabled=true;
+  send.onclick=async()=>{
+    const body=ta.value.trim(); if(!body) return;
+    send.disabled=true; send.textContent="접는 중…";
+    try{
+      await rpc("dp_launch",{p_body:body});
+      Sea.paper();
+      await refresh();
+      go("launched");
+    }catch(e){ send.disabled=false; send.textContent="바다에 띄우기"; toast(errMsg(e),true); }
+  };
+  row.appendChild(back); row.appendChild(send); b.appendChild(row);
+
+  function upd(){
+    const n=[...ta.value].length;
+    cnt.textContent=n+" / "+MAX_LEN;
+    cnt.className="counter"+(n>MAX_LEN?" over":n>MAX_LEN*0.85?" warn":"");
+    send.disabled = n===0 || n>MAX_LEN;
+  }
+  ta.addEventListener("input",upd); upd();
+  show(win("편지 쓰기 · A LETTER", b));
+  setTimeout(()=>ta.focus(),60);
+}
+
+function viewLaunched(){
+  dock.hidden=true; ctx.showBoat=true;
+  const b=el("div","col");
+  b.innerHTML=`
+    <div class="label">LAUNCHED</div>
+    <h1 class="title" style="font-size:clamp(21px,4.6vw,28px)">배가 떠났습니다</h1>
+    <p class="lede">이제 이 배는 하루에 약 <b style="color:var(--amber)">889km</b>씩 퍼져 나갑니다.
+      가까운 항구의 누군가는 오늘 안에, 지구 반대편이라면 스무 날쯤 뒤에 이 배를 만나게 돼요.</p>
+    <p class="muted">발견되면 알려드릴 방법이 없으니, 가끔 들러 주세요.
+      배는 30일이 지나면 조용히 가라앉습니다.</p>`;
+  const row=el("div","row");
+  const ok=el("button","btn primary","항구로 돌아가기"); ok.onclick=()=>go("home");
+  row.appendChild(ok); b.appendChild(row);
+  show(win("출항 · LAUNCHED", b));
+}
+
+/* ---------- 내가 띄운 배(표류 중) ---------- */
+function viewMine(){
+  dock.hidden=false; ctx.showBoat=true;
+  const boat=board.boat;
+  if(!boat){ go("home"); return; }
+  const t0=new Date(boat.launched_at).getTime();
+  const hrs=(now()-t0)/3600000;
+  const reach=SPEED_KMH*hrs;
+
+  const b=el("div","col");
+  b.innerHTML=`<div class="label">DRIFTING · ${Math.floor(hrs)}H</div>`;
+  const st=el("div","stat-row");
+  [["REACH",fmtKm(reach),"지금까지 닿은 거리"],
+   ["ADRIFT",fmtDur(now()-t0),"떠다닌 시간"],
+   ["SINKS IN",fmtDur(t0+30*86400000-now()),"가라앉기까지"]].forEach(([k,v,ko])=>{
+    const d=el("div","stat"); d.appendChild(el("div","v",v)); d.appendChild(el("div","k",k+" · "+ko)); st.appendChild(d);
+  });
+  b.appendChild(st);
+
+  b.appendChild(el("p","lede","이 반경 안에 있는 사람이라면, 지금 이 배를 건져 올릴 수 있습니다."));
+  b.appendChild(el("div","hr"));
+  b.appendChild(el("div","label","보낸 편지"));
+  const p=el("div","paper mine"); p.textContent=boat.body; b.appendChild(p);
+
+  const row=el("div","row end");
+  const back=el("button","btn ghost","항구로"); back.onclick=()=>go("home");
+  row.appendChild(back); b.appendChild(row);
+  show(win("표류 중 · YOUR BOAT", b));
+  paintDock();
+}
+
+/* ---------- 배 건지기 ---------- */
+async function doDiscover(){
+  slotIn.disabled=true;
+  const main=slotIn.querySelector(".card-main");
+  const before=main?main.textContent:"";
+  if(main) main.textContent="수평선을 살피는 중…";
+  try{
+    const id=await rpc("dp_discover");
+    await refresh();
+    if(!id){
+      paintDock();
+      toast("아직 이 항구에 닿은 배가 없어요. 먼 바다의 배는 오는 데 며칠이 걸립니다.");
+      return;
+    }
+    Sea.paper();
+    go("read",{id});
+  }catch(e){
+    slotIn.disabled=false; if(main) main.textContent=before;
+    toast(errMsg(e),true);
+  }
+}
+
+/* ---------- 편지 읽기 / 항해 상세 ---------- */
+function findVoyage(id){ return (board.voyages||[]).find(v=>v.id===id); }
+
+function viewVoyage(){
+  dock.hidden=false; ctx.showBoat=false;
+  const v=findVoyage(ctx.id);
+  if(!v){ go("home"); return; }
+  const g=voyageStage(v);
+  const isKeeper = v.a_keeper && v.side==="B";
+
+  const b=el("div","col");
+
+  /* 머리말 */
+  const head=el("div","col");
+  head.innerHTML=`
+    <div class="label">${v.side==="A"?"MY BOAT · 내가 띄운 배":"FOUND · 내가 건진 배"}</div>
+    <h1 class="title" style="font-size:clamp(19px,4.2vw,25px)">${esc(v.other_nick)} · ${esc(v.other_port)}</h1>`;
+  b.appendChild(head);
+
+  const st=el("div","stat-row");
+  [["DISTANCE",fmtKm(v.distance_km),"두 항구 사이"],
+   ["ONE WAY",fmtDur(v.leg_ms),"편지 한 통의 항해"],
+   ["LETTERS",(v.letters||[]).length+"통","오간 편지"]].forEach(([k,val,ko])=>{
+    const d=el("div","stat"); d.appendChild(el("div","v",val)); d.appendChild(el("div","k",k+" · "+ko)); st.appendChild(d);
+  });
+  b.appendChild(st);
+
+  /* 항해 단면 + 세계 지도 */
+  const A=[v.a_lat,v.a_lng], B=[v.b_lat,v.b_lng];
+  let prog=null, dir=null;
+  if(g.code==="incoming"||g.code==="outgoing"){
+    const total=Math.max(1,g.at-g.from);
+    prog=clamp((now()-g.from)/total,0,1);
+    dir = v.pending.side==="A" ? "AB" : "BA";
+  }
+
+  const strip=document.createElement("canvas"); strip.id="strip";
+  strip.setAttribute("role","img");
+  strip.setAttribute("aria-label",
+    esc(v.a_port)+"에서 "+esc(v.b_port)+"까지 "+fmtKm(v.distance_km)+"의 항로");
+  b.appendChild(strip);
+  drawStrip(strip,v,prog,dir==="BA");
+
+  const ends=el("div","ends");
+  const lft=el("div"); lft.appendChild(el("div","nm", v.side==="A" ? board.sailor.nick : v.other_nick));
+  lft.appendChild(el("div","pt", v.a_port)); ends.appendChild(lft);
+  const rgt=el("div","r"); rgt.appendChild(el("div","nm", v.side==="B" ? board.sailor.nick : v.other_nick));
+  rgt.appendChild(el("div","pt", v.b_port)); ends.appendChild(rgt);
+  b.appendChild(ends);
+
+  const cvs=document.createElement("canvas"); cvs.id="chart";
+  cvs.setAttribute("role","img");
+  cvs.setAttribute("aria-label","지구 위 두 항구의 위치와 대권 항로");
+  drawChart(cvs,A,B,prog,dir);
+  ctx._chart={cvs,strip,A,B,g,v};
+
+  /* 항해 게이지 */
+  if(prog!=null){
+    const gw=el("div","col");
+    const bar=el("div","gauge");
+    const fill=el("i"); fill.style.width=(prog*100).toFixed(1)+"%";
+    const knob=el("b"); knob.style.left=(prog*100).toFixed(1)+"%";
+    bar.appendChild(fill); bar.appendChild(knob);
+    gw.appendChild(bar);
+    const line=el("div","row");
+    const eta=el("span","eta"); eta.id="etaText";
+    eta.textContent=fmtDur(g.at-now())+" 남음";
+    line.appendChild(eta);
+    const when=el("span","muted"); when.textContent="도착 예정 · "+fmtWhen(g.at);
+    line.appendChild(when);
+    gw.appendChild(line);
+    const what=el("p","lede");
+    what.textContent = g.code==="incoming"
+      ? "편지가 이쪽으로 오고 있습니다. 도착하기 전에는 아무도 내용을 볼 수 없어요."
+      : "당신의 편지가 바다를 건너는 중입니다.";
+    gw.appendChild(what);
+    b.appendChild(gw);
+  }
+
+  const mapLbl=el("div","label","ON THE GLOBE · 지구 위에서");
+  b.appendChild(mapLbl);
+  b.appendChild(cvs);
+
+  b.appendChild(el("div","hr"));
+
+  /* 등대지기 고지 */
+  if(isKeeper){
+    const k=el("div","keeper-badge");
+    k.innerHTML="<span>🗼</span><span><b>등대지기의 편지입니다.</b> 사람이 아니라, 바다가 비어 있을 때를 위해 이 우체국이 띄워 둔 편지예요. 답장을 보내면 등대에서도 답이 돌아옵니다.</span>";
+    b.appendChild(k);
+  }
+
+  /* 편지들 */
+  const letters=(v.letters||[]).slice().sort((x,y)=>x.seq-y.seq);
+  letters.forEach(L=>{
+    const wrap=el("div","col"); wrap.style.gap="6px";
+    const p=el("div","paper"+(L.mine?" mine":""));
+    const meta=el("div","paper-meta");
+    meta.appendChild(el("span",null,L.mine?"YOU":"THEM"));
+    const ko=el("span","ko", L.mine ? "내가 보낸 편지" : (isKeeper&&L.side==="A" ? "등대지기" : esc(v.other_nick))+"의 편지");
+    meta.appendChild(ko);
+    const when=el("span","ko","도착 "+fmtWhen(L.arrives_at));
+    when.style.marginLeft="auto"; meta.appendChild(when);
+    p.appendChild(meta);
+    const body=el("div"); body.style.whiteSpace="pre-wrap"; body.textContent=L.body;
+    p.appendChild(body);
+    wrap.appendChild(p);
+    b.appendChild(wrap);
+  });
+
+  /* 답장 */
+  if(g.code==="toread"){
+    b.appendChild(el("div","hr"));
+    const rl=el("div","label","답장 쓰기 · REPLY"); b.appendChild(rl);
+    const note=el("p","muted");
+    note.textContent="이 답장은 "+fmtKm(v.distance_km)+"를 건너야 합니다. 도착까지 약 "+fmtDur(v.leg_ms)+" 걸려요.";
+    b.appendChild(note);
+    const ta=document.createElement("textarea");
+    ta.maxLength=MAX_LEN; ta.placeholder="읽었다는 것만 전해도 충분합니다.";
+    ta.setAttribute("aria-label","답장 내용");
+    b.appendChild(ta);
+    const mrow=el("div","row");
+    const cnt=el("span","counter","0 / "+MAX_LEN); mrow.appendChild(cnt);
+    b.appendChild(mrow);
+
+    const row=el("div","row end");
+    if(v.side==="B" && !letters.some(L=>L.mine)){
+      const rel=el("button","btn ghost","답장 없이 다시 바다로");
+      rel.onclick=async()=>{
+        if(!confirm("이 편지를 바다로 돌려보낼까요? 다른 사람이 건질 수 있게 됩니다.")) return;
+        rel.disabled=true;
+        try{ await rpc("dp_release",{p_voyage:v.id}); await refresh(); go("home"); toast("배를 다시 바다로 보냈어요."); }
+        catch(e){ rel.disabled=false; toast(errMsg(e),true); }
+      };
+      row.appendChild(rel);
+    }
+    const send=el("button","btn primary","답장 띄우기"); send.disabled=true;
+    send.onclick=async()=>{
+      const body=ta.value.trim(); if(!body) return;
+      send.disabled=true; send.textContent="접는 중…";
+      try{
+        const at=await rpc("dp_reply",{p_voyage:v.id,p_body:body});
+        Sea.paper(); await refresh();
+        go("voyage",{id:v.id});
+        toast("답장이 출발했어요. 도착 예정 "+fmtWhen(at));
+      }catch(e){ send.disabled=false; send.textContent="답장 띄우기"; toast(errMsg(e),true); }
+    };
+    row.appendChild(send); b.appendChild(row);
+    ta.addEventListener("input",()=>{
+      const n=[...ta.value].length;
+      cnt.textContent=n+" / "+MAX_LEN;
+      cnt.className="counter"+(n>MAX_LEN?" over":n>MAX_LEN*0.85?" warn":"");
+      send.disabled=n===0||n>MAX_LEN;
+    });
+  }else if(g.code==="waiting"){
+    b.appendChild(el("p","lede", v.side==="A"
+      ? "당신의 편지는 전해졌습니다. 답장이 올지는 그 사람의 몫이에요."
+      : "답장을 보냈습니다. 이제 기다리는 일만 남았어요."));
+  }
+
+  /* 마무리 */
+  b.appendChild(el("div","hr"));
+  const foot=el("div","row");
+  const back=el("button","btn ghost","항구로"); back.onclick=()=>go("home");
+  foot.appendChild(back);
+  const sp=el("div"); sp.style.flex="1"; foot.appendChild(sp);
+  const rep=el("button","btn ghost tiny","신고");
+  rep.onclick=async()=>{
+    const why=prompt("어떤 점이 문제였는지 짧게 알려주세요.");
+    if(why===null) return;
+    try{ await rpc("dp_report_voyage",{p_voyage:v.id,p_reason:why}); toast("접수했습니다. 살펴볼게요."); }
+    catch(e){ toast(errMsg(e),true); }
+  };
+  foot.appendChild(rep);
+  const fin=el("button","btn ghost tiny","항해 마치기");
+  fin.onclick=async()=>{
+    if(!confirm("이 항해를 마칠까요? 일지에 남고, 슬롯이 비워집니다.")) return;
+    try{ await rpc("dp_close",{p_voyage:v.id}); await refresh(); go("home"); toast("항해를 마쳤습니다."); }
+    catch(e){ toast(errMsg(e),true); }
+  };
+  foot.appendChild(fin);
+  b.appendChild(foot);
+
+  show(win((v.side==="A"?"내 배의 항로":"건져 올린 편지")+" · VOYAGE", b));
+  paintDock();
+}
+
+/* 읽기 = 항해 상세와 동일 화면 */
+function viewRead(){ ctx.id=ctx.id||null; screen="voyage"; viewVoyage(); }
+
+/* ---------- 항해일지 ---------- */
+async function viewLog(){
+  dock.hidden=true; ctx.showBoat=true;
+  const b=el("div","col");
+  b.appendChild(el("div","label","LOGBOOK · 지난 항해"));
+  const list=el("div","col"); b.appendChild(list);
+  list.appendChild(el("p","muted","일지를 펴는 중…"));
+  const row=el("div","row end");
+  const back=el("button","btn ghost","돌아가기"); back.onclick=()=>go(board&&board.registered?"home":"intro");
+  row.appendChild(back); b.appendChild(row);
+  show(win("항해일지 · LOGBOOK", b));
+
+  try{
+    const items=await rpc("dp_logbook");
+    list.innerHTML="";
+    if(!items||!items.length){
+      list.appendChild(el("p","lede","아직 마친 항해가 없습니다. 편지를 띄우거나, 건져 올린 편지의 항해를 마치면 여기 남아요."));
+      return;
+    }
+    items.forEach(v=>{
+      const it=el("div","logitem");
+      const h=el("div","row");
+      h.appendChild(el("span","label",(v.side==="A"?"내가 띄움":"내가 건짐")));
+      const nm=el("span",null,(v.a_keeper&&v.side==="B"?"등대지기":v.other_nick)+" · "+v.other_port);
+      nm.style.fontFamily='"Do Hyeon",sans-serif'; nm.style.color="var(--paper)";
+      h.appendChild(nm);
+      const d=el("span","counter",fmtKm(v.distance_km)); d.style.marginLeft="auto";
+      h.appendChild(d);
+      it.appendChild(h);
+      const n=(v.letters||[]).length;
+      it.appendChild(el("div","card-sub", n+"통의 편지 · 마지막 "+fmtWhen(v.last_at)));
+      const open=el("button","btn ghost tiny","펼쳐 보기");
+      open.onclick=()=>{
+        if(open.dataset.o){ open.nextSibling && open.nextSibling.remove(); open.dataset.o=""; open.textContent="펼쳐 보기"; return; }
+        const box=el("div","col"); box.style.marginTop="8px";
+        (v.letters||[]).forEach(L=>{
+          const p=el("div","paper"+(L.mine?" mine":""));
+          const m=el("div","paper-meta");
+          m.appendChild(el("span","ko",L.mine?"내가 보낸 편지":"받은 편지"));
+          const w=el("span","ko",fmtWhen(L.arrives_at)); w.style.marginLeft="auto"; m.appendChild(w);
+          p.appendChild(m);
+          const bd=el("div"); bd.style.whiteSpace="pre-wrap"; bd.textContent=L.body; p.appendChild(bd);
+          box.appendChild(p);
+        });
+        it.appendChild(box); open.dataset.o="1"; open.textContent="접기";
+      };
+      it.appendChild(open);
+      list.appendChild(it);
+    });
+  }catch(e){
+    list.innerHTML=""; list.appendChild(el("p","lede",errMsg(e)));
+  }
+}
+
+/* ---------- 규칙 ---------- */
+function viewAbout(){
+  dock.hidden=true; ctx.showBoat=true;
+  const b=el("div","col");
+  b.innerHTML=`
+    <div class="label">HOW IT WORKS</div>
+    <h1 class="title" style="font-size:clamp(20px,4.4vw,26px)">이 우체국의 규칙</h1>
+
+    <p class="lede"><b style="color:var(--amber)">1. 배는 진짜 속도로 갑니다.</b><br>
+      편지는 20노트, 시속 37km로 항해합니다. 화물선의 순항 속도예요.
+      하루에 약 889km. 서울에서 도쿄까지 약 하루 반, 서울에서 뉴욕까지 약 12일이 걸립니다.</p>
+
+    <p class="lede"><b style="color:var(--amber)">2. 발견도 거리를 따릅니다.</b><br>
+      띄운 배는 시간이 갈수록 넓게 퍼집니다. 아직 당신의 항구까지 오지 못한 배는
+      건져 올릴 수 없어요. 먼 나라의 편지는 며칠을 기다려야 만납니다.</p>
+
+    <p class="lede"><b style="color:var(--amber)">3. 한 번에 한 척.</b><br>
+      띄울 수 있는 배도 한 척, 건질 수 있는 배도 한 척입니다.
+      항해를 마쳐야 다음 배를 띄울 수 있어요. 그래서 한 통 한 통이 귀합니다.</p>
+
+    <p class="lede"><b style="color:var(--amber)">4. 도착 전에는 아무도 못 읽습니다.</b><br>
+      항해 중인 편지의 내용은 서버가 내어주지 않습니다. 기다림을 건너뛸 방법은 없어요.</p>
+
+    <div class="hr"></div>
+    <div class="label">PRIVACY · 우리가 모르는 것</div>
+    <p class="lede">로그인이 없습니다. 이름·이메일·전화번호를 묻지 않아요.
+      브라우저에 익명 열쇠 하나가 저장되고, 그것으로 당신을 기억합니다.</p>
+    <p class="lede">위치는 약 <b>25km 격자</b>로 반올림해서 저장합니다.
+      다른 사람에게는 좌표 대신 가장 가까운 항구 이름만 보여요.
+      브라우저 저장소를 지우면 항해 기록도 함께 사라집니다.</p>
+
+    <div class="hr"></div>
+    <div class="label">SAFETY · 부탁</div>
+    <p class="lede">편지에 개인정보를 적지 말아 주세요. 모르는 사이라서 지킬 수 있는 것들이 있습니다.
+      불쾌한 편지는 <b>신고</b>하고 <b>다시 바다로</b> 보내면 그 배는 다시 당신에게 오지 않습니다.</p>
+    <p class="muted">배는 30일이 지나면 가라앉습니다. 아무도 건지지 않은 편지는 그대로 바다에 남습니다.</p>
+
+    <div class="hr"></div>
+    <div class="label">LIGHTHOUSE · 등대지기</div>
+    <p class="lede">바다가 비어 있을 때, 세계 곳곳의 등대에서 띄운 편지를 만날 수 있습니다.
+      그건 사람이 아니라 <b>이 우체국이 써 둔 편지</b>이고, 만날 때마다 그렇게 표시됩니다.
+      사람이 띄운 배는 언제나 등대의 배보다 먼저 발견됩니다.</p>`;
+  const row=el("div","row");
+  if(board && board.registered){
+    const again=el("button","btn ghost","항구·이름 다시 정하기");
+    again.onclick=()=>{
+      if(!confirm("항구를 옮기면 앞으로의 편지는 새 항구를 기준으로 항해합니다. 진행 중인 항해는 그대로예요. 계속할까요?")) return;
+      go("port");
+    };
+    row.appendChild(again);
+  }
+  const sp2=el("div"); sp2.style.flex="1"; row.appendChild(sp2);
+  const back=el("button","btn ghost","돌아가기");
+  back.onclick=()=>{ const t=ctx.back||(board&&board.registered?"home":"intro"); go(t); };
+  row.appendChild(back); b.appendChild(row);
+  show(win("이곳의 규칙 · ABOUT", b));
+}
+
+/* ---------- 오류 ---------- */
+function viewFatal(msg){
+  dock.hidden=true; ctx.showBoat=true;
+  const b=el("div","col");
+  b.innerHTML=`<div class="label">OFFLINE</div>
+    <h1 class="title" style="font-size:clamp(20px,4.4vw,26px)">바다에 닿지 못했어요</h1>
+    <p class="lede">${esc(msg)}</p>
+    <p class="muted">잠시 뒤 새로고침하면 대개 돌아옵니다.</p>`;
+  const r=el("div","row"); const rb=el("button","btn primary","다시 시도");
+  rb.onclick=()=>location.reload(); r.appendChild(rb); b.appendChild(r);
+  show(win("연결 · CONNECTION", b));
+}
+
+/* ---------- 라우터 ---------- */
+function render(){
+  const chip=$("#portChip");
+  if(board&&board.registered) chip.innerHTML="<b>"+esc(board.sailor.port)+"</b>";
+  else chip.textContent="";
+  switch(screen){
+    case "intro":    viewIntro(); break;
+    case "port":     viewPort(); break;
+    case "nick":     viewNick(); break;
+    case "home":     viewHome(); break;
+    case "compose":  viewCompose(); break;
+    case "launched": viewLaunched(); break;
+    case "mine":     viewMine(); break;
+    case "read":     viewRead(); break;
+    case "voyage":   viewVoyage(); break;
+    case "log":      viewLog(); break;
+    case "about":    viewAbout(); break;
+    default:         viewIntro();
+  }
+}
+
+/* ---------- 1초마다 남은 시간만 갱신 ---------- */
+function tick(){
+  const eta=$("#etaText");
+  if(eta && ctx._chart && ctx._chart.g && ctx._chart.g.at){
+    const g=ctx._chart.g;
+    const left=g.at-now();
+    eta.textContent = left>0 ? fmtDur(left)+" 남음" : "곧 도착합니다";
+    const total=Math.max(1,g.at-g.from);
+    const p=clamp((now()-g.from)/total,0,1);
+    const fill=$(".gauge i"), knob=$(".gauge b");
+    if(fill) fill.style.width=(p*100).toFixed(2)+"%";
+    if(knob) knob.style.left=(p*100).toFixed(2)+"%";
+    const c=ctx._chart;
+    const dir = c.v.pending && c.v.pending.side==="A" ? "AB" : "BA";
+    if(c.strip && c.strip.isConnected) drawStrip(c.strip,c.v,p,dir==="BA");
+    if(c.cvs && c.cvs.isConnected) drawChart(c.cvs,c.A,c.B,p,dir);
+    if(left<=0 && !ctx._reloading){ ctx._reloading=true; setTimeout(poll,1500); }
+  }
+  if(screen==="home"||screen==="mine"){
+    const st=outboundState();
+    if(st.kind==="drifting"||st.kind==="voyage") paintDock();
+  }
+}
+
+/* ---------- 주기적 새로고침 ---------- */
+async function poll(){
+  try{
+    await refresh();
+    ctx._reloading=false;
+    if(screen==="home") { viewHome(); }
+    else if(screen==="voyage"){ if(findVoyage(ctx.id)) viewVoyage(); else go("home"); }
+    else if(screen==="mine"){ viewMine(); }
+  }catch(e){ /* 조용히 넘어간다 */ }
+}
+
+/* ============================================================
+   7. 시작
+   ============================================================ */
+async function boot(){
+  Ocean.start();
+
+  // 소리 버튼
+  const sbtn=$("#btnSound");
+  sbtn.textContent="✕";
+  sbtn.onclick=()=>Sea.toggle();
+  $("#btnLog").onclick=()=>go("log");
+  $("#btnAbout").onclick=()=>go("about",{back:screen});
+
+  if(!window.supabase){ viewFatal("파도 소리는 나는데, 바다로 가는 길이 막혀 있어요. (라이브러리 로드 실패)"); return; }
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:false, storageKey:"dp.auth" }
+  });
+
+  try{
+    let {data:{session}} = await sb.auth.getSession();
+    if(!session){
+      const {data,error}=await sb.auth.signInAnonymously();
+      if(error) throw error;
+      session=data.session;
+    }
+    if(!session) throw new Error("세션을 만들지 못했어요.");
+  }catch(e){
+    viewFatal("익명 열쇠를 만들지 못했습니다. "+(e.message||""));
+    return;
+  }
+
+  try{ await refresh(); }
+  catch(e){ viewFatal(errMsg(e)); return; }
+
+  // 소리 설정 복원 (자동재생은 첫 클릭 이후에만)
+  if(load(LS.sound,"")==="1"){
+    const once=async()=>{ await Sea.toggle(true); removeEventListener("pointerdown",once); removeEventListener("keydown",once); };
+    addEventListener("pointerdown",once,{once:true}); addEventListener("keydown",once,{once:true});
+  }
+
+  if(board.registered){
+    store(LS.nick, board.sailor.nick); store(LS.port, board.sailor.port);
+    go("home");
+  }else{
+    go(load(LS.seen,"")==="1" ? "port" : "intro");
+  }
+  store(LS.seen,"1");
+
+  tickTimer=setInterval(tick,1000);
+  pollTimer=setInterval(()=>{ if(!document.hidden) poll(); }, 30000);
+  document.addEventListener("visibilitychange",()=>{ if(!document.hidden) poll(); });
+}
+
+addEventListener("error",e=>{ console.error(e.error||e.message); });
+boot();
+})();
+</script>
+</body>
+</html>
