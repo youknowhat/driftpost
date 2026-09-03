@@ -1015,6 +1015,30 @@ async function rpc(fn,args){
   if(error) throw error;
   return data;
 }
+
+/* 익명 열쇠는 "바다에 이름을 걸 때" 처음 만든다.
+   구경만 하고 나가는 사람에게는 계정을 만들지 않는다. */
+let hasSession=false;
+async function ensureSession(){
+  const {data:{session}}=await sb.auth.getSession();
+  if(session){ hasSession=true; return session; }
+  const {data,error}=await sb.auth.signInAnonymously();
+  if(error) throw error;
+  hasSession=true;
+  return data.session;
+}
+
+/* 열쇠 자체가 죽은 경우에만 참(만료·삭제·서명 불일치).
+   네트워크 순단이나 서버 오류로는 절대 참이 되면 안 된다 —
+   여기서 잘못 판단하면 그 사람의 배와 편지가 통째로 사라진다. */
+function isAuthError(e){
+  if(!e) return false;
+  const st = e.status || e.statusCode || (e.originalError && e.originalError.status);
+  if(st===401 || st===403) return true;
+  const m = ((e.message||"")+" "+(e.code||"")+" "+(e.hint||"")).toLowerCase();
+  if(/failed to fetch|networkerror|timeout|aborted|load failed/.test(m)) return false;
+  return /jwt|invalid token|token is expired|bad_jwt|user( |_)not( |_)found|session( |_)not( |_)found|refresh( |_)token/.test(m);
+}
 async function refresh(){
   const d=await rpc("dp_board");
   if(d && d.now){ skewMs = new Date(d.now).getTime() - Date.now(); }
@@ -1054,6 +1078,17 @@ function viewIntro(){
     <p class="muted">로그인은 없습니다. 이름도, 얼굴도 묻지 않아요.<br>
       필요한 건 당신이 어느 바다에 서 있는지, 그것 하나입니다.</p>
   `;
+  // 계정 없이도 읽을 수 있는 바다의 상태 (dp_stats 는 anon 에게도 열려 있다)
+  const alive=el("p","muted"); alive.style.minHeight="20px"; b.appendChild(alive);
+  (async()=>{
+    try{
+      const st=await rpc("dp_stats");
+      if(!st) return;
+      alive.innerHTML='지금 이 바다에 <b style="color:var(--foam)">'+(st.drifting||0)+'척</b>이 떠 있고, '
+        + '<b style="color:var(--foam)">'+(st.sailing||0)+'통</b>의 편지가 항해 중입니다.';
+    }catch(e){}
+  })();
+
   const row=el("div","row");
   const go1=el("button","btn primary","바다로 나가기");
   go1.onclick=async()=>{ await Sea.toggle(true); startPort(); };
@@ -1158,6 +1193,7 @@ function viewNick(){
     const nick=inp.value.trim()||randNick();
     ok.disabled=true; ok.textContent="등록 중…";
     try{
+      await ensureSession();
       await rpc("dp_register",{p_nick:nick,p_lat:ctx.lat,p_lng:ctx.lng,p_port:ctx.port});
       const label=ctx.port;
       store(LS.nick,nick); store(LS.port,label);
@@ -1819,6 +1855,7 @@ function isTyping(){
   return !!(ta && ta.value.trim());
 }
 async function poll(){
+  if(!hasSession) return;
   try{
     await refresh();
     ctx._reloading=false;
@@ -1847,32 +1884,37 @@ async function boot(){
     auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:false, storageKey:"dp.auth" }
   });
 
-  try{
-    let {data:{session}} = await sb.auth.getSession();
-    if(!session){
-      const {data,error}=await sb.auth.signInAnonymously();
-      if(error) throw error;
-      session=data.session;
-    }
-    if(!session) throw new Error("세션을 만들지 못했어요.");
-  }catch(e){
-    viewFatal("익명 열쇠를 만들지 못했습니다. "+(e.message||""));
-    return;
-  }
-
-  // 저장된 열쇠가 더 이상 통하지 않으면(만료·삭제) 조용히 새 열쇠를 만든다
+  // 저장된 열쇠가 "정말로" 죽었을 때만 새 열쇠를 만든다.
   async function reauth(){
     try{ await sb.auth.signOut(); }catch(e){}
     const {data,error}=await sb.auth.signInAnonymously();
     if(error) throw error;
+    hasSession=true;
     return refresh();
   }
-  try{
-    const d=await refresh();
-    if(!d || d.ok===false) await reauth();
-  }catch(e){
-    try{ await reauth(); }
-    catch(e2){ viewFatal(errMsg(e2)); return; }
+
+  let session=null;
+  try{ session=(await sb.auth.getSession()).data.session; }catch(e){}
+  hasSession=!!session;
+
+  if(session){
+    try{
+      const d=await refresh();
+      // 서버가 세션 없다고 답하면 그때만 열쇠를 새로 만든다
+      if(d && d.ok===false && d.reason==="no_session"){
+        try{ await reauth(); }
+        catch(e2){ viewFatal(errMsg(e2)); return; }
+      }
+    }catch(e){
+      if(isAuthError(e)){
+        try{ await reauth(); }
+        catch(e2){ viewFatal(errMsg(e2)); return; }
+      }else{
+        // 네트워크·서버 문제 — 열쇠는 절대 건드리지 않는다
+        viewFatal(errMsg(e));
+        return;
+      }
+    }
   }
 
   // 소리 설정 복원 (자동재생은 첫 클릭 이후에만)
@@ -1881,7 +1923,7 @@ async function boot(){
     addEventListener("pointerdown",once,{once:true}); addEventListener("keydown",once,{once:true});
   }
 
-  if(board.registered){
+  if(board && board.registered){
     store(LS.nick, board.sailor.nick); store(LS.port, board.sailor.port);
     go("home");
   }else{
@@ -1890,8 +1932,8 @@ async function boot(){
   store(LS.seen,"1");
 
   tickTimer=setInterval(tick,1000);
-  pollTimer=setInterval(()=>{ if(!document.hidden) poll(); }, 30000);
-  document.addEventListener("visibilitychange",()=>{ if(!document.hidden) poll(); });
+  pollTimer=setInterval(()=>{ if(!document.hidden && hasSession) poll(); }, 30000);
+  document.addEventListener("visibilitychange",()=>{ if(!document.hidden && hasSession) poll(); });
 }
 
 addEventListener("error",e=>{ console.error(e.error||e.message); });
