@@ -1156,6 +1156,7 @@ const ERRS={
   "not yours":"내 편지가 아니에요.",
   "too many picks":"조금 쉬었다 주워 주세요. 한 시간에 스무 통까지예요.",
   "bad code":"그런 열쇠는 없어요. 띄어쓰기 없이 하이픈(-)까지 그대로 넣어주세요.",
+  "moved too soon":"자리는 한 시간에 한 번만 옮길 수 있어요.",
   "device busy":"이 브라우저에 이미 진행 중인 편지가 있어요. 그 편지를 접은 뒤에 이어가 주세요.",
   "too many tries":"열쇠를 너무 여러 번 넣었어요. 한 시간 뒤에 다시 시도해 주세요.",
   "bad body":"편지는 1자 이상 500자 이하여야 합니다."
@@ -1379,6 +1380,8 @@ function voyageStage(v){
   const letters=v.letters||[], p=v.pending;
   if(p && !p.mine) return {code:"incoming", at:new Date(p.arrives_at).getTime(), from:new Date(p.sent_at).getTime()};
   if(p && p.mine)  return {code:"outgoing", at:new Date(p.arrives_at).getTime(), from:new Date(p.sent_at).getTime()};
+  // 상대가 접었으면 서버가 더 이상 답장을 받지 않는다. 쓰게 두면 안 된다.
+  if(v.other_closed) return {code:"ended"};
   if(v.my_turn)    return {code:"toread"};
   if(letters.length && letters[letters.length-1].mine) return {code:"waiting"};
   return {code:"toread"};
@@ -1444,6 +1447,9 @@ function paintDock(){
       oh.querySelector(".pip").classList.add("sail");
       slotOut.appendChild(el("div","card-main","내 편지가 가는 중"));
       slotOut.appendChild(el("div","card-sub",esc(out.v.other_port)+"까지 "+fmtDur(g.at-now())+" 남음"));
+    }else if(g.code==="ended"){
+      slotOut.appendChild(el("div","card-main","상대가 접었어요"));
+      slotOut.appendChild(el("div","card-sub","눌러서 자리를 비울 수 있어요."));
     }else{
       slotOut.appendChild(el("div","card-main","누군가 주웠어요"));
       slotOut.appendChild(el("div","card-sub",esc(out.v.other_port)+" · 답장은 아직입니다."));
@@ -1483,6 +1489,9 @@ function paintDock(){
       ih.querySelector(".pip").classList.add("sail");
       slotIn.appendChild(el("div","card-main","답장이 오는 중"));
       slotIn.appendChild(el("div","card-sub",fmtDur(g.at-now())+" 남음"));
+    }else if(g.code==="ended"){
+      slotIn.appendChild(el("div","card-main","상대가 접었어요"));
+      slotIn.appendChild(el("div","card-sub","눌러서 자리를 비울 수 있어요."));
     }else{
       slotIn.appendChild(el("div","card-main","답장을 기다리는 중"));
       slotIn.appendChild(el("div","card-sub","올 수도, 오지 않을 수도 있어요."));
@@ -1781,7 +1790,7 @@ function viewVoyage(){
   });
   ctx._fresh=false;
 
-  if(g.code==="toread"){
+  if(g.code==="toread" && !v.other_closed){
     const rl=el("div","label","답장"); b.appendChild(rl);
     const note=el("p","muted","도착까지 약 "+fmtDur(v.leg_ms)+" 걸려요.");
     b.appendChild(note);
@@ -1794,7 +1803,7 @@ function viewVoyage(){
     const cnt=el("span","counter","0 / "+MAX_LEN); mrow.appendChild(cnt); b.appendChild(mrow);
 
     const row=el("div","row end");
-    if(v.side==="B" && !letters.some(L=>L.mine)){
+    if(v.side==="B" && !letters.some(L=>L.mine) && !v.other_closed){
       const rel=el("button","btn ghost","다시 바다로");
       rel.onclick=async()=>{
         if(!confirm("답장하지 않고 돌려보낼까요? 다른 사람이 주울 수 있게 됩니다.")) return;
@@ -1827,6 +1836,8 @@ function viewVoyage(){
       send.disabled=n===0||n>MAX_LEN||!!send.dataset.busy;
     };
     ta.addEventListener("input",upd); upd();
+  }else if(g.code==="ended"){
+    b.appendChild(el("p","lede","상대가 이 편지를 접었습니다. 더 보낼 수는 없지만, 오간 편지는 남아요."));
   }else if(g.code==="waiting"){
     b.appendChild(el("p","lede", v.side==="A"
       ? "편지는 전해졌습니다. 답장이 올지는 그 사람의 몫이에요."
@@ -1847,7 +1858,7 @@ function viewVoyage(){
     };
     foot.appendChild(rep);
   }
-  const fin=el("button","btn ghost tiny","이 편지 접기");
+  const fin=el("button","btn ghost tiny", g.code==="ended" ? "접어서 자리 비우기" : "이 편지 접기");
   fin.onclick=async()=>{
     if(!confirm("이 편지를 접을까요? 지난 편지함에 남고, 자리가 비워집니다.")) return;
     try{ await rpc("dp_close",{p_voyage:v.id}); await refresh(); go("home"); toast("접었습니다."); }
