@@ -280,6 +280,12 @@ input[type=text]:focus{border-color:var(--amber);}
 .toast.err{border-color:var(--danger);}
 
 .logitem{border:2px solid var(--line); background:#160f26; padding:10px 12px; display:flex; flex-direction:column; gap:5px;}
+.keybox{
+  background:var(--paper); color:var(--ink); border:var(--px) solid #0c0a16;
+  box-shadow:0 var(--px) 0 0 #0c0a16; padding:14px 12px; text-align:center;
+  font-family:"Do Hyeon",sans-serif; font-size:clamp(15px,4vw,21px); letter-spacing:.02em;
+  word-break:keep-all; line-height:1.5; user-select:all; -webkit-user-select:all;
+}
 
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
 
@@ -377,7 +383,7 @@ const SUPABASE_KEY = "sb_publishable_NgVHDq30C1pVI10Rp8seVQ_XDwcxtNh";
 const SPEED_KMH = 37.04;          // 20노트 — 서버와 동일한 상수
 const MAX_LEN   = 500;
 const LS = {
-  sound:"dp.sound", nick:"dp.nick", port:"dp.port", seen:"dp.seen", block:"dp.block"
+  sound:"dp.sound", nick:"dp.nick", port:"dp.port", seen:"dp.seen", key:"dp.key"
 };
 
 let sb = null, board = null, skewMs = 0, pollTimer = null, tickTimer = null;
@@ -810,7 +816,15 @@ const Ocean = (function(){
   function cinematic(kind, dur){
     if(reduce){ draw(performance.now()); return Promise.resolve(); }
     if(cine && cine.res) cine.res();
-    return new Promise(res=>{ cine={kind:kind, dur:dur||4200, t0:null, res:res}; });
+    const d = dur||4200;
+    return new Promise(res=>{
+      let done=false;
+      const finish=()=>{ if(done) return; done=true; if(cine && cine.res===finish) cine=null; res(); };
+      cine={kind:kind, dur:d, t0:null, res:finish};
+      // 탭이 숨겨지면 rAF 가 멈춰 연출이 끝나지 않는다.
+      // 그 사이 화면이 "접는 중…"에서 멎지 않도록 벽시계로도 한 번 더 건다.
+      setTimeout(finish, d + 1800);
+    });
   }
   function setFar(n){
     const v=Math.max(0, n|0);
@@ -1085,6 +1099,43 @@ function portLabel(la,lo){
 }
 const coarse = v => Math.round(v/0.25)*0.25;
 
+/* ---------- 이어가기 열쇠 ----------
+   로그인이 없으니, 브라우저를 옮기면 신원을 잃는다.
+   단어 넷짜리 열쇠를 만들어 서버에는 sha256 만 남기고 평문은 여기에만 둔다. */
+const KEYWORDS=["조약돌","파도","물결","노을","갈매기","모래","소라","물빛","바람","별빛","밀물","썰물",
+"잔물결","물안개","해초","산호","등불","부표","종이배","유리병","물비늘","발자국","조개","바닷새",
+"여울","물살","아침","저녁","구름","이슬","서리","안개","달빛","햇살","물방울","파랑","하늘","수평선",
+"백사장","갯벌","자갈","나무","돛","닻","그물","뗏목","표류","항로","나침반","지도","편지","봉투",
+"우표","잉크","연필","종이","접기","주름","매듭","실","리본","상자","열쇠","자물쇠"];
+function makeKey(){
+  const a=new Uint32Array(4); crypto.getRandomValues(a);
+  return [...a].map(v=>KEYWORDS[v % KEYWORDS.length]).join("-");
+}
+async function sha256hex(str){
+  const buf=await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str.trim().toLowerCase()));
+  return [...new Uint8Array(buf)].map(x=>x.toString(16).padStart(2,"0")).join("");
+}
+async function ensureKey(){
+  let k=load(LS.key,"");
+  if(!k){ k=makeKey(); store(LS.key,k); }
+  try{ await rpc("dp_link_code",{p_hash: await sha256hex(k)}); }catch(e){}
+  return k;
+}
+function keyLink(k){
+  return location.origin+location.pathname+"#k="+encodeURIComponent(k);
+}
+async function copyText(t){
+  try{ await navigator.clipboard.writeText(t); return true; }
+  catch(e){
+    try{
+      const ta=document.createElement("textarea"); ta.value=t;
+      ta.style.position="fixed"; ta.style.opacity="0";
+      document.body.appendChild(ta); ta.select();
+      const ok=document.execCommand("copy"); ta.remove(); return ok;
+    }catch(e2){ return false; }
+  }
+}
+
 /* 이름 짓기 */
 const ADJ=["고요한","다정한","늦은","이른","서툰","조용한","오래된","작은","먼","흐린","맑은","무던한","느린","깊은","낡은","따뜻한","무심한","씩씩한","게으른","성실한","어설픈","단단한"];
 const NOU=["조약돌","갈매기","모래알","물결","돛","부표","파도","모래섬","안개","별자리","밀물","썰물","소라","조개껍데기","노을","유리병","물비늘","종이배","잔물결","물그림자","바닷바람","발자국"];
@@ -1104,6 +1155,9 @@ const ERRS={
   "already replied":"이미 답장을 보낸 편지예요.",
   "not yours":"내 편지가 아니에요.",
   "too many picks":"조금 쉬었다 주워 주세요. 한 시간에 스무 통까지예요.",
+  "bad code":"그런 열쇠는 없어요. 띄어쓰기 없이 하이픈(-)까지 그대로 넣어주세요.",
+  "device busy":"이 브라우저에 이미 진행 중인 편지가 있어요. 그 편지를 접은 뒤에 이어가 주세요.",
+  "too many tries":"열쇠를 너무 여러 번 넣었어요. 한 시간 뒤에 다시 시도해 주세요.",
   "bad body":"편지는 1자 이상 500자 이하여야 합니다."
 };
 function errMsg(e){
@@ -1189,6 +1243,11 @@ function viewIntro(){
   q.onclick=()=>go("about",{back:"intro"});
   row.appendChild(go1); row.appendChild(q);
   b.appendChild(row);
+
+  const already=el("button","btn ghost tiny","다른 기기에서 쓰던 게 있어요");
+  already.style.alignSelf="flex-start";
+  already.onclick=()=>go("claim",{back:"intro"});
+  b.appendChild(already);
   show(win("둥실둥실", b, "panel-narrow"));
 }
 
@@ -1231,6 +1290,13 @@ function viewPort(){
   search.setAttribute("aria-label","바다 이름으로 찾기");
   b.appendChild(search);
   const list=el("div","portlist"); b.appendChild(list);
+
+  if(!(board && board.registered)){
+    const already=el("button","btn ghost tiny","다른 기기에서 쓰던 게 있어요");
+    already.style.alignSelf="flex-start";
+    already.onclick=()=>go("claim",{back:"port"});
+    b.appendChild(already);
+  }
 
   const priv=document.createElement("details"); priv.className="fold";
   priv.innerHTML=`<summary>위치를 어떻게 다루나요</summary>
@@ -1285,8 +1351,9 @@ function viewNick(){
       await rpc("dp_register",{p_nick:nick,p_lat:ctx.lat,p_lng:ctx.lng,p_port:ctx.port});
       const label=ctx.port;
       store(LS.nick,nick); store(LS.port,label);
-      await refresh(); go("home");
-      toast(label+" 앞바다");
+      const k=await ensureKey();
+      await refresh();
+      go("key",{key:k, first:true});
     }catch(e){ ok.disabled=false; ok.textContent="여기서 시작하기"; toast(errMsg(e),true); }
   };
   row.appendChild(back); row.appendChild(ok);
@@ -1595,6 +1662,24 @@ async function doDiscover(){
   }
 }
 
+/* 도착 시각을 캘린더 일정으로. 알림 서버 없이 기억하는 가장 단순한 방법. */
+function icsFor(v,g){
+  const z=d=>new Date(d).toISOString().replace(/[-:]/g,"").replace(/\.\d{3}/,"");
+  const at=new Date(g.at);
+  const who=(v.a_keeper&&v.side==="B") ? "오래된 병편지" : (v.other_nick||"누군가");
+  const lines=[
+    "BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//dungsil//KR","CALSCALE:GREGORIAN",
+    "BEGIN:VEVENT","UID:"+v.id+"@dungsil","DTSTAMP:"+z(Date.now()),
+    "DTSTART:"+z(at),"DTEND:"+z(at.getTime()+15*60000),
+    "SUMMARY:둥실둥실 — 편지가 도착합니다",
+    "DESCRIPTION:"+(v.other_port||"먼바다")+"의 "+who+"에게서 온 편지가 도착할 시각입니다.",
+    "URL:"+location.origin+location.pathname,
+    "BEGIN:VALARM","TRIGGER:-PT30M","ACTION:DISPLAY","DESCRIPTION:곧 도착합니다","END:VALARM",
+    "END:VEVENT","END:VCALENDAR"
+  ];
+  return "data:text/calendar;charset=utf-8,"+encodeURIComponent(lines.join("\r\n"));
+}
+
 /* ---------- 편지 읽기 / 항해 상세 ---------- */
 function findVoyage(id){ return (board.voyages||[]).find(v=>v.id===id); }
 
@@ -1652,6 +1737,11 @@ function viewVoyage(){
     line.appendChild(eta);
     line.appendChild(el("span","muted","도착 "+fmtWhen(g.at)));
     gw.appendChild(line);
+    // 며칠 뒤 일을 기억할 방법 — 알림 대신 캘린더 한 줄
+    const cal=document.createElement("a");
+    cal.className="btn ghost tiny"; cal.textContent="도착 시각 알림 받기";
+    cal.href=icsFor(v,g); cal.download="dungsil.ics"; cal.style.alignSelf="flex-start";
+    gw.appendChild(cal);
     b.appendChild(gw);
   }
 
@@ -1772,6 +1862,81 @@ function viewVoyage(){
 
 function viewRead(){ ctx._fresh=true; screen="voyage"; viewVoyage(); }
 
+/* ---------- 이어가기 열쇠 보여주기 ---------- */
+function viewKey(){
+  dock.hidden=true; ctx.showBoat=true; Ocean.setFar(0);
+  const k=ctx.key||load(LS.key,"");
+  const b=el("div","col");
+  b.appendChild(el("p","lede","편지는 며칠씩 걸립니다. 그동안 다른 기기에서 열거나 브라우저를 정리하면, 이 열쇠 없이는 이어갈 수 없어요."));
+
+  const box=el("div","keybox",k||"—");
+  box.setAttribute("role","text");
+  b.appendChild(box);
+
+  const row=el("div","row");
+  const c1=el("button","btn ghost","열쇠 복사");
+  c1.onclick=async()=>{ toast(await copyText(k) ? "복사했어요." : "복사가 막혀 있어요. 길게 눌러 복사해 주세요.", false); };
+  const c2=el("button","btn ghost","이어가기 링크 복사");
+  c2.onclick=async()=>{ toast(await copyText(keyLink(k)) ? "링크를 복사했어요. 다른 기기에서 열면 이어집니다." : "복사가 막혀 있어요.", false); };
+  row.appendChild(c1); row.appendChild(c2);
+  b.appendChild(row);
+
+  const f=document.createElement("details"); f.className="fold";
+  f.innerHTML=`<summary>이게 왜 필요한가요</summary>
+    <div class="in"><p>로그인이 없어서, 지금은 <b>이 브라우저</b>가 곧 당신입니다.</p>
+    <p>폰과 노트북을 오가거나, 방문 기록을 지우거나, 시크릿 창을 쓰면 다른 사람이 됩니다.
+    띄운 배도 오던 답장도 그때 끊겨요. 이 열쇠는 그걸 잇는 유일한 방법입니다.</p>
+    <p>서버에는 이 열쇠의 <b>지문(해시)</b>만 남습니다. 잃어버리면 저희도 되찾아 드릴 수 없어요.</p></div>`;
+  b.appendChild(f);
+
+  const foot=el("div","row end");
+  const ok=el("button","btn primary", ctx.first ? "적어뒀어요" : "돌아가기");
+  ok.onclick=()=>go(ctx.first ? "home" : (ctx.back||"about"));
+  foot.appendChild(ok); b.appendChild(foot);
+  show(win("이어가기 열쇠", b, "panel-narrow"));
+}
+
+/* ---------- 다른 기기에서 이어받기 ---------- */
+function viewClaim(){
+  dock.hidden=true; ctx.showBoat=true; Ocean.setFar(0);
+  const b=el("div","col");
+  b.innerHTML=`<h1 class="title" style="font-size:clamp(19px,4.2vw,25px)">이어가기</h1>
+    <p class="lede">전에 쓰던 열쇠를 넣어주세요. 띄운 배와 주고받던 편지가 그대로 돌아옵니다.</p>`;
+  const inp=document.createElement("input");
+  inp.type="text"; inp.placeholder="조약돌-노을-밀물-종이배";
+  inp.setAttribute("aria-label","이어가기 열쇠");
+  inp.value=ctx.code||"";
+  b.appendChild(inp);
+  const msg=el("p","muted"); msg.style.minHeight="20px"; b.appendChild(msg);
+
+  const row=el("div","row end");
+  const back=el("button","btn ghost","뒤로");
+  back.onclick=()=>go(ctx.back||"intro");
+  const ok=el("button","btn primary","이어가기");
+  ok.onclick=async()=>{
+    const code=inp.value.trim();
+    if(!code){ msg.textContent="열쇠를 넣어주세요."; return; }
+    ok.disabled=true; ok.textContent="찾는 중…";
+    try{
+      await ensureSession();
+      const r=await rpc("dp_claim",{p_code:code});
+      store(LS.key,code);
+      if(r && r.nick) store(LS.nick,r.nick);
+      if(r && r.port) store(LS.port,r.port);
+      await refresh();
+      go("home");
+      toast((r&&r.nick? r.nick+" · ":"")+"이어졌습니다.");
+    }catch(e){
+      ok.disabled=false; ok.textContent="이어가기";
+      msg.textContent=errMsg(e);
+    }
+  };
+  row.appendChild(back); row.appendChild(ok);
+  b.appendChild(row);
+  show(win("이어가기", b, "panel-narrow"));
+  setTimeout(()=>inp.focus(),60);
+}
+
 /* ---------- 지난 편지 ---------- */
 async function viewLog(){
   dock.hidden=true; ctx.showBoat=true; Ocean.setFar(0);
@@ -1857,6 +2022,9 @@ function viewAbout(){
 
   const row=el("div","row");
   if(board && board.registered){
+    const keyb=el("button","btn ghost tiny","이어가기 열쇠");
+    keyb.onclick=()=>go("key",{back:"about"});
+    row.appendChild(keyb);
     const again=el("button","btn ghost tiny","자리 옮기기");
     again.onclick=()=>{
       if(!confirm("자리를 옮기면 앞으로의 편지는 새 자리를 기준으로 항해합니다. 진행 중인 편지는 그대로예요.")) return;
@@ -1900,6 +2068,8 @@ function render(){
     case "read":     viewRead(); break;
     case "voyage":   viewVoyage(); break;
     case "log":      viewLog(); break;
+    case "key":      viewKey(); break;
+    case "claim":    viewClaim(); break;
     case "about":    viewAbout(); break;
     default:         viewIntro();
   }
@@ -2023,18 +2193,56 @@ async function boot(){
     addEventListener("pointerdown",once,{once:true}); addEventListener("keydown",once,{once:true});
   }
 
+  // 이어가기 링크(#k=…)
+  if(await takeLinkKey()) { startTimers(); return; }
+
   if(board && board.registered){
     store(LS.nick, board.sailor.nick); store(LS.port, board.sailor.port);
+    // 열쇠가 아직 없는 사람에게는 조용히 하나 만들어 붙여둔다
+    if(!board.sailor.has_code || !load(LS.key,"")) { ensureKey().catch(()=>{}); }
     go("home");
   }else{
     go(load(LS.seen,"")==="1" ? "port" : "intro");
   }
   store(LS.seen,"1");
 
+  startTimers();
+}
+
+let timersOn=false;
+function startTimers(){
+  if(timersOn) return;
+  timersOn=true;
   tickTimer=setInterval(tick,1000);
   pollTimer=setInterval(()=>{ if(!document.hidden && hasSession) poll(); }, 30000);
   document.addEventListener("visibilitychange",()=>{ if(!document.hidden && hasSession) poll(); });
 }
+
+/* 주소창의 #k=… 를 소비한다. 페이지를 새로 읽지 않고 해시만 바뀌는 경우도 있어서
+   hashchange 에서도 같은 처리를 한다. */
+async function takeLinkKey(){
+  const m=(location.hash||"").match(/[#&]k=([^&]+)/);
+  if(!m) return false;
+  let code;
+  try{ code=decodeURIComponent(m[1]); }catch(e){ code=m[1]; }
+  try{ history.replaceState(null,"",location.pathname+location.search); }catch(e){ location.hash=""; }
+  try{
+    await ensureSession();
+    const r=await rpc("dp_claim",{p_code:code});
+    store(LS.key,code); store(LS.seen,"1");
+    if(r&&r.nick) store(LS.nick,r.nick);
+    if(r&&r.port) store(LS.port,r.port);
+    await refresh();
+    go("home");
+    toast((r&&r.nick? r.nick+" · ":"")+"이어졌습니다.");
+  }catch(e){
+    store(LS.seen,"1");
+    go("claim",{code:code, back:"intro"});
+    toast(errMsg(e), true);
+  }
+  return true;
+}
+addEventListener("hashchange",()=>{ if(sb) takeLinkKey(); });
 
 addEventListener("error",e=>{ console.error(e.error||e.message); });
 boot();
