@@ -557,6 +557,7 @@ const Sea = (function(){
 const Ocean = (function(){
   const cv=$("#sea"), c=cv.getContext("2d",{alpha:false});
   let W=0,H=0,PX=3,t0=performance.now();
+  let img=null;           /* 프레임 버퍼 — 매 프레임 새로 만들면 저사양 기기가 버겁다 */
   let cine=null;          /* {kind:'depart'|'arrive', dur, t0, res} */
   let farCount=0;         /* 수평선에 보이는 다른 배 수 */
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -630,12 +631,13 @@ const Ocean = (function(){
     cv.width=W; cv.height=H;
     cv.style.width="100%"; cv.style.height="100%";
     c.imageSmoothingEnabled=false;
+    img=null;   /* 크기가 바뀌었으니 버퍼를 다시 만든다 */
   }
 
   function draw(ts){
     const t=(ts-t0)/1000;
     const P=SKIES[phase];
-    const img=c.createImageData(W,H);
+    if(!img || img.width!==W || img.height!==H) img=c.createImageData(W,H);
     const hz=Math.floor(H*0.52);                       // 수평선
     const seaH=Math.max(1,H-hz);
 
@@ -1108,8 +1110,10 @@ const KEYWORDS=["조약돌","파도","물결","노을","갈매기","모래","소
 "백사장","갯벌","자갈","나무","돛","닻","그물","뗏목","표류","항로","나침반","지도","편지","봉투",
 "우표","잉크","연필","종이","접기","주름","매듭","실","리본","상자","열쇠","자물쇠"];
 function makeKey(){
-  const a=new Uint32Array(4); crypto.getRandomValues(a);
-  return [...a].map(v=>KEYWORDS[v % KEYWORDS.length]).join("-");
+  const a=new Uint32Array(5); crypto.getRandomValues(a);
+  const words=[...a].slice(0,4).map(v=>KEYWORDS[v % KEYWORDS.length]);
+  const n=String(a[4] % 1000).padStart(3,"0");   // 64^4 × 1000 ≈ 167억
+  return words.join("-")+"-"+n;
 }
 async function sha256hex(str){
   const buf=await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str.trim().toLowerCase()));
@@ -1902,7 +1906,7 @@ function viewKey(){
 
   const foot=el("div","row end");
   const ok=el("button","btn primary", ctx.first ? "적어뒀어요" : "돌아가기");
-  ok.onclick=()=>go(ctx.first ? "home" : (ctx.back||"about"));
+  ok.onclick=()=>{ if(ctx.first) go("home"); else goBack("about"); };
   foot.appendChild(ok); b.appendChild(foot);
   show(win("이어가기 열쇠", b, "panel-narrow"));
 }
@@ -1914,7 +1918,7 @@ function viewClaim(){
   b.innerHTML=`<h1 class="title" style="font-size:clamp(19px,4.2vw,25px)">이어가기</h1>
     <p class="lede">전에 쓰던 열쇠를 넣어주세요. 띄운 배와 주고받던 편지가 그대로 돌아옵니다.</p>`;
   const inp=document.createElement("input");
-  inp.type="text"; inp.placeholder="조약돌-노을-밀물-종이배";
+  inp.type="text"; inp.placeholder="조약돌-노을-밀물-종이배-473";
   inp.setAttribute("aria-label","이어가기 열쇠");
   inp.value=ctx.code||"";
   b.appendChild(inp);
@@ -1956,7 +1960,7 @@ async function viewLog(){
   list.appendChild(el("p","muted","펴 보는 중…"));
   const row=el("div","row end");
   const back=el("button","btn ghost","돌아가기");
-  back.onclick=()=>go(board&&board.registered?"home":"intro");
+  back.onclick=()=>goBack();
   row.appendChild(back); b.appendChild(row);
   show(win("지난 편지", b));
 
@@ -2045,7 +2049,7 @@ function viewAbout(){
   }
   const sp=el("div"); sp.style.flex="1"; row.appendChild(sp);
   const back=el("button","btn ghost","돌아가기");
-  back.onclick=()=>{ const t=ctx.back||(board&&board.registered?"home":"intro"); go(t); };
+  back.onclick=()=>goBack();
   row.appendChild(back); b.appendChild(row);
   show(win("어떻게 되는 건가요", b));
 }
@@ -2061,6 +2065,15 @@ function viewFatal(msg){
   const r=el("div","row"); const rb=el("button","btn primary","다시 시도");
   rb.onclick=()=>location.reload(); r.appendChild(rb); b.appendChild(r);
   show(win("연결 · CONNECTION", b));
+}
+
+/* 보던 화면으로 정확히 되돌아간다 (편지를 읽다 '?' 를 눌러도 자리를 잃지 않게) */
+function goBack(fallback){
+  const b=ctx.back;
+  if(b && typeof b==="object" && b.screen){
+    screen=b.screen; ctx=b.ctx||{}; render(); return;
+  }
+  go(typeof b==="string" ? b : (fallback || (board&&board.registered ? "home" : "intro")));
 }
 
 /* ---------- 라우터 ---------- */
@@ -2124,9 +2137,20 @@ function isTyping(){
   const ta=stage.querySelector("textarea");
   return !!(ta && ta.value.trim());
 }
+function boardSig(){
+  if(!board) return "";
+  const st=board.stats||{};
+  return JSON.stringify([
+    board.registered, board.peek, st.drifting, st.sailing,
+    board.boat && board.boat.id,
+    (board.voyages||[]).map(v=>[v.id,(v.letters||[]).length,
+      v.pending && v.pending.arrives_at, v.my_turn, v.closed, v.other_closed])
+  ]);
+}
 async function poll(){
   if(!hasSession || Ocean.busy) return;
   try{
+    const sigBefore=boardSig();
     const before=stage.querySelector(".win-body");
     const scrollTop=before?before.scrollTop:0;
     const openFolds=[...stage.querySelectorAll("details.fold")].map(d=>d.open);
@@ -2134,6 +2158,8 @@ async function poll(){
     ctx._reloading=false;
     // 쓰던 글이 있으면 화면을 갈아엎지 않는다
     if(isTyping()){ if(board&&board.registered&&!dock.hidden) paintDock(); return; }
+    // 실제로 바뀐 게 없으면 그대로 둔다. 읽는 중에 화면이 튀지 않아야 한다.
+    if(boardSig()===sigBefore){ if(!dock.hidden) paintDock(); return; }
     if(screen==="home") viewHome();
     else if(screen==="voyage"){ if(findVoyage(ctx.id)) viewVoyage(); else go("home"); }
     else if(screen==="mine") viewMine();
@@ -2156,8 +2182,9 @@ async function boot(){
   const sbtn=$("#btnSound");
   sbtn.textContent="✕";
   sbtn.onclick=()=>Sea.toggle();
-  $("#btnLog").onclick=()=>go("log");
-  $("#btnAbout").onclick=()=>go("about",{back:screen});
+  const snap=()=>({screen:screen, ctx:Object.assign({},ctx)});
+  $("#btnLog").onclick=()=>go("log",{back:snap()});
+  $("#btnAbout").onclick=()=>go("about",{back:snap()});
 
   if(!window.supabase){ viewFatal("파도 소리는 나는데, 바다로 가는 길이 막혀 있어요. (라이브러리 로드 실패)"); return; }
   sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
