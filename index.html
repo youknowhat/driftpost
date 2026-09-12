@@ -1188,13 +1188,13 @@ const randNick=()=> ADJ[Math.floor(Math.random()*ADJ.length)]+" "+NOU[Math.floor
    5. 서버
    ============================================================ */
 const ERRS={
-  "outbound slot busy":"이미 띄운 배가 있어요. 그 편지를 접어야 새로 띄울 수 있습니다.",
+  "outbound slot busy":"이미 띄운 배가 있어요. 그 편지를 접어야 새로 띄울 수 있어요.",
   "inbound slot busy":"이미 주운 편지가 있어요. 한 번에 한 통만요.",
-  "not registered":"자리를 먼저 정해주세요.",
+  "not registered":"먼저 어느 바다 앞인지 정해 주세요.",
   "no session":"연결이 끊겼어요. 새로고침해 주세요.",
   "not your turn":"지금은 답장할 차례가 아니에요.",
   "still sailing":"편지가 아직 항해 중이에요.",
-  "voyage closed":"이미 접은 편지입니다.",
+  "voyage closed":"이미 접은 편지예요.",
   "already replied":"이미 답장을 보낸 편지예요.",
   "not yours":"내 편지가 아니에요.",
   "too many picks":"조금 쉬었다 주워 주세요. 한 시간에 스무 통까지예요.",
@@ -1202,12 +1202,12 @@ const ERRS={
   "moved too soon":"자리는 한 시간에 한 번만 옮길 수 있어요.",
   "device busy":"이 브라우저에 이미 진행 중인 편지가 있어요. 그 편지를 접은 뒤에 이어가 주세요.",
   "too many tries":"열쇠를 너무 여러 번 넣었어요. 한 시간 뒤에 다시 시도해 주세요.",
-  "bad body":"편지는 1자 이상 500자 이하여야 합니다."
+  "bad body":"편지는 500자까지 쓸 수 있어요."
 };
 function errMsg(e){
   const raw=(e && (e.message||e.hint||"")) || "";
   for(const k in ERRS) if(raw.indexOf(k)>=0) return ERRS[k];
-  if(/fetch|network|Failed/i.test(raw)) return "바다가 잠시 멀어졌어요. 잠시 뒤 다시 시도해 주세요.";
+  if(/fetch|network|Failed/i.test(raw)) return "바다가 잠깐 멀어졌어요. 조금 뒤에 다시 해 주세요.";
   return "문제가 생겼어요: "+raw;
 }
 async function rpc(fn,args){
@@ -1268,9 +1268,9 @@ function viewIntro(){
   const b=el("div","col");
   b.innerHTML=`
     <h1 class="title">둥실둥실</h1>
-    <p class="lede">접은 종이배에 편지를 실어 바다에 띄웁니다.<br>
+    <p class="lede">접은 종이배에 편지를 실어 바다에 띄워요.<br>
       낯선 누군가가 그걸 줍고, 답장은
-      <b style="color:var(--amber)">진짜 배가 오는 시간</b>만큼 걸려 도착해요.</p>`;
+      <b style="color:var(--amber)">진짜 배가 건너오는 시간</b>만큼 걸려 도착해요.</p>`;
 
   const alive=el("p","muted"); alive.style.minHeight="20px"; b.appendChild(alive);
   (async()=>{
@@ -1305,7 +1305,7 @@ function viewPort(){
   const b=el("div","col");
   b.innerHTML=`
     <h1 class="title" style="font-size:clamp(20px,4.4vw,27px)">어느 바다 앞에 서 있나요?</h1>
-    <p class="lede">편지가 바다를 건너는 시간을 재야 해서, 대략의 위치만 여쭙니다.</p>`;
+    <p class="lede">편지가 바다를 건너는 시간을 재야 해서, 어디쯤인지만 알려 주세요.</p>`;
 
   const status=el("p","muted"); status.style.minHeight="20px";
 
@@ -1347,9 +1347,9 @@ function viewPort(){
 
   const priv=document.createElement("details"); priv.className="fold";
   priv.innerHTML=`<summary>위치를 어떻게 다루나요</summary>
-    <div class="in"><p>정확한 좌표는 저장하지 않습니다. 약 <b>25km 격자</b>로 반올림한 값만 남아요.</p>
-    <p>화면에는 <b>가장 가까운 바다 이름</b>만 나옵니다. 편지를 주고받는 상대에게는 지도를 그리려고
-    <b>1도(약 111km)</b> 단위로 더 뭉갠 좌표가 전달돼요.</p></div>`;
+    <div class="in"><p>정확한 좌표는 저장하지 않아요. 약 <b>25km 격자</b>로 반올림한 값만 남아요.</p>
+    <p>화면에는 <b>가장 가까운 바다 이름</b>만 나와요. 편지를 주고받는 상대에게는 지도를 그리기 위해
+    <b>1도(약 111km)</b> 단위로 더 흐리게 만든 좌표만 전달돼요.</p></div>`;
   b.appendChild(priv);
 
   function paint(q){
@@ -1376,16 +1376,16 @@ function viewNick(){
   dock.hidden=true; ctx.showBoat=true; Ocean.setFar(0);
   const b=el("div","col");
   b.innerHTML=`<h1 class="title" style="font-size:clamp(20px,4.4vw,27px)">뭐라고 부를까요?</h1>
-    <p class="lede">본명은 필요 없습니다. 편지 끝에 적힐 이름이에요.</p>`;
+    <p class="lede">본명은 필요 없어요. 편지 끝에 적힐 이름이에요.</p>`;
   const wrap=el("div","row");
   const inp=document.createElement("input"); inp.type="text"; inp.maxLength=24;
   inp.setAttribute("aria-label","이름");
   inp.value=(board&&board.registered?board.sailor.nick:load(LS.nick,""))||randNick();
   inp.style.flex="1 1 180px";
-  const dice=el("button","btn ghost","다시"); dice.onclick=()=>{ inp.value=randNick(); };
+  const dice=el("button","btn ghost","다른 이름"); dice.onclick=()=>{ inp.value=randNick(); };
   wrap.appendChild(inp); wrap.appendChild(dice);
   b.appendChild(wrap);
-  b.appendChild(el("p","muted", ctx.port+" 앞에서 띄웁니다."));
+  b.appendChild(el("p","muted", ctx.port+"에서 띄워요."));
 
   const row=el("div","row end");
   const back=el("button","btn ghost","뒤로"); back.onclick=()=>go("port");
@@ -1442,8 +1442,8 @@ function viewHome(){
   Ocean.setFar(peek);
 
   const greet = Ocean.phase==="night" ? "밤바다입니다."
-              : Ocean.phase==="dawn"  ? "동이 트는 중입니다."
-              : Ocean.phase==="day"   ? "해가 높습니다."
+              : Ocean.phase==="dawn"  ? "동이 트고 있습니다."
+              : Ocean.phase==="day"   ? "해가 높이 떴습니다."
               :                          "노을이 지고 있습니다.";
   const b=el("div","col");
   b.innerHTML=`
@@ -1498,10 +1498,10 @@ function paintDock(){
       slotOut.appendChild(el("div","card-sub",esc(out.v.other_port)+"까지 "+fmtDur(g.at-now())+" 남음"));
     }else if(g.code==="ended"){
       slotOut.appendChild(el("div","card-main","상대가 접었어요"));
-      slotOut.appendChild(el("div","card-sub","눌러서 자리를 비울 수 있어요."));
+      slotOut.appendChild(el("div","card-sub","접어 두면 새 배를 띄울 수 있어요."));
     }else{
       slotOut.appendChild(el("div","card-main","누군가 주웠어요"));
-      slotOut.appendChild(el("div","card-sub",esc(out.v.other_port)+" · 답장은 아직입니다."));
+      slotOut.appendChild(el("div","card-sub",esc(out.v.other_port)+" · 답장은 아직이에요."));
     }
     slotOut.onclick=()=>go("voyage",{id:out.v.id});
   }else{
@@ -1540,7 +1540,7 @@ function paintDock(){
       slotIn.appendChild(el("div","card-sub",fmtDur(g.at-now())+" 남음"));
     }else if(g.code==="ended"){
       slotIn.appendChild(el("div","card-main","상대가 접었어요"));
-      slotIn.appendChild(el("div","card-sub","눌러서 자리를 비울 수 있어요."));
+      slotIn.appendChild(el("div","card-sub","접어 두면 다른 배를 주울 수 있어요."));
     }else{
       slotIn.appendChild(el("div","card-main","답장을 기다리는 중"));
       slotIn.appendChild(el("div","card-sub","올 수도, 오지 않을 수도 있어요."));
@@ -1594,7 +1594,7 @@ function bindDraft(ta, id){
 function viewCompose(){
   dock.hidden=true; ctx.showBoat=true; Ocean.setFar(0);
   const b=el("div","col");
-  b.appendChild(el("p","lede","누가 읽을지는 아무도 모릅니다. 그래서 더 솔직해도 괜찮아요."));
+  b.appendChild(el("p","lede","누가 읽을지는 아무도 몰라요. 그래서 더 솔직해도 괜찮아요."));
 
   const ta=document.createElement("textarea");
   ta.maxLength=MAX_LEN; ta.placeholder="바다 건너 누군가에게…";
@@ -1616,7 +1616,7 @@ function viewCompose(){
   const f2=document.createElement("details"); f2.className="fold";
   f2.innerHTML=`<summary>지켜주셨으면 하는 것</summary>
     <div class="in"><p>이름·연락처·계정처럼 <b>당신을 특정할 수 있는 건 적지 말아 주세요.</b>
-    모르는 사이라서 지킬 수 있는 것들이 있습니다.</p></div>`;
+    모르는 사이라서 지킬 수 있는 것들이 있어요.</p></div>`;
   b.appendChild(f2);
 
   const row=el("div","row end");
@@ -1654,20 +1654,20 @@ function viewLaunched(){
   const b=el("div","col");
   b.innerHTML=`
     <h1 class="title" style="font-size:clamp(20px,4.4vw,27px)">떠났습니다</h1>
-    <p class="lede">배는 하루에 약 <b style="color:var(--amber)">889km</b>씩 퍼져 나갑니다.<br>
-      가까운 사람은 오늘 안에, 지구 반대편이면 스무 날쯤 뒤에 이 배를 만나요.</p>`;
+    <p class="lede">배는 하루에 약 <b style="color:var(--amber)">889km</b>씩 나아가요.<br>
+      가까운 바다에는 오늘 안에, 지구 반대편에는 스무 날쯤 뒤에 닿아요.</p>`;
   if(board.boat) b.appendChild(reachBlock(board.boat));
   const f=document.createElement("details"); f.className="fold";
   f.innerHTML=`<summary>알아두면 좋은 것</summary>
-    <div class="in"><p>누가 주웠는지는 알려드릴 수 없어요. 대신 이 배가 어느 바다에 닿았는지는 매일 여기서 볼 수 있습니다.</p>
-    <p>30일이 지나도 아무도 줍지 않으면, 배는 조용히 가라앉습니다.</p></div>`;
+    <div class="in"><p>누가 주웠는지는 알려 드릴 수 없어요. 대신 이 배가 어느 바다에 닿았는지는 매일 여기서 볼 수 있어요.</p>
+    <p>30일이 지나도 아무도 줍지 않으면, 배는 조용히 가라앉아요.</p></div>`;
   b.appendChild(f);
   const row=el("div","row");
   const ok=el("button","btn primary","돌아가기"); ok.onclick=()=>go("home");
   row.appendChild(ok);
   if(board.boat){
     const sp=el("div"); sp.style.flex="1"; row.appendChild(sp);
-    row.appendChild(shareButton("부친 자리 남기기", ()=>departCard(board.boat), "둥실둥실-출항.png"));
+    row.appendChild(shareButton("한 장으로 남기기", ()=>departCard(board.boat), "둥실둥실-출항.png"));
   }
   b.appendChild(row);
   show(win("출항", b));
@@ -1685,7 +1685,7 @@ function viewMine(){
   const st=el("div","stat-row");
   [["REACH",fmtKm(reach),"닿은 거리"],
    ["ADRIFT",fmtDur(now()-t0),"떠다닌 시간"],
-   ["SINKS IN",fmtDur(t0+30*86400000-now()),"남은 수명"]].forEach(([k,v,ko])=>{
+   ["SINKS IN",fmtDur(t0+30*86400000-now()),"가라앉기까지"]].forEach(([k,v,ko])=>{
     const d=el("div","stat"); d.appendChild(el("div","v",v)); d.appendChild(el("div","k",k+" · "+ko)); st.appendChild(d);
   });
   b.appendChild(st);
@@ -1701,7 +1701,7 @@ function viewMine(){
   const back=el("button","btn ghost","돌아가기"); back.onclick=()=>go("home");
   row.appendChild(back);
   const sp=el("div"); sp.style.flex="1"; row.appendChild(sp);
-  row.appendChild(shareButton("부친 자리 남기기", ()=>departCard(boat), "둥실둥실-출항.png"));
+  row.appendChild(shareButton("한 장으로 남기기", ()=>departCard(boat), "둥실둥실-출항.png"));
   b.appendChild(row);
   show(win("떠 있는 중", b));
   paintDock();
@@ -1771,7 +1771,7 @@ function reachBlock(boat){
   if(far && far.at>n && next.indexOf(far)<0) list.appendChild(reachLine(fmtReach(far.at),far.name,false,true));
   box.appendChild(list);
   box.appendChild(el("p","muted", reached.length
-    ? "지금까지 "+reached.length+"개의 바다를 지났어요. 그곳 사람이면 이 배를 주울 수 있습니다."
+    ? "지금까지 "+reached.length+"개의 바다를 지났어요. 그곳 사람이면 이 배를 주울 수 있어요."
     : "아직 첫 바다에 닿기 전이에요."));
   return box;
 }
@@ -1780,7 +1780,7 @@ function reachBlock(boat){
    펜팔의 자랑은 본문이 아니라 봉투에 찍힌 낯선 소인이었다.
    도착한 편지에만 찍힌다. 본문도 이름도 없다 — 어디서, 얼마나, 언제. */
 function localHourAt(lng){ return (((Date.now()/3600000)%24) + lng/15 + 24) % 24; }
-function fmtLocalHour(h){ const hh=Math.floor(h); const part = hh<5?"새벽":hh<12?"아침":hh<18?"낮":hh<21?"저녁":"밤"; return "지금 "+part+" "+(hh%12||12)+"시"; }
+function fmtLocalHour(h){ const hh=Math.floor(h); if(hh===0) return "지금 자정 무렵"; const part = hh<5?"새벽":hh<9?"아침":hh<12?"오전":hh<18?"낮":hh<21?"저녁":"밤"; return "지금 "+part+" "+(hh%12||12)+"시"; }
 function phaseOfHour(h){ return (h>=5&&h<8)?"dawn":(h>=8&&h<16)?"day":(h>=16&&h<20)?"dusk":"night"; }
 function inkFor(ph){ return ph==="night"?"#8a8ad2": ph==="dawn"?"#d98b8b": ph==="day"?"#5a9fb6": "#df8760"; }
 function drawPostmark(port, kmv, ms, arrivedAt, seed){
@@ -1936,7 +1936,7 @@ async function drawCard(v, g, o){
   const capt = o.capt ? o.capt
              : (g && g.code==="incoming") ? "지금 바다 위에 있습니다"
              : (g && g.code==="outgoing") ? fmtDur(g.at-now())+" 뒤에 닿습니다"
-             : fmtDur(v.leg_ms)+" 걸려서 닿았습니다";
+             : fmtDur(v.leg_ms)+" 걸려 닿았습니다";
   g2.fillText(capt, CX, base+250);
 
   g2.fillStyle="#8a7a9e";
@@ -1970,7 +1970,7 @@ function shareButton(label, make, filename, okMsg){
     try{
       const cv=await make();
       const r=await shareCanvas(cv, filename);
-      if(r==="saved") toast(okMsg||"저장했어요. 편지 내용과 이름은 담기지 않습니다.");
+      if(r==="saved") toast(okMsg||"저장했어요. 편지 내용과 이름은 담기지 않아요.");
     }catch(e){ toast("만들지 못했어요.",true); }
     bt.disabled=false; bt.textContent=was;
   };
@@ -2039,12 +2039,12 @@ function viewVoyage(){
   const hourA = v.side==="A" ? myHour() : (typeof v.a_lng==="number" ? localHourAt(v.a_lng) : null);
   const hourB = v.side==="B" ? myHour() : (typeof v.b_lng==="number" ? localHourAt(v.b_lng) : null);
   lft.appendChild(el("div","pt", v.a_port));
-  if(hourA!=null) lft.appendChild(el("div","pt", fmtLocalHour(hourA)+(v.side==="A"?"":" 쯤"))).style.color="#9c8bad";
+  if(hourA!=null) lft.appendChild(el("div","pt", fmtLocalHour(hourA)+(v.side==="A"?"":"쯤"))).style.color="#9c8bad";
   ends.appendChild(lft);
   const rgt=el("div","r");
   rgt.appendChild(el("div","nm", v.side==="B" ? board.sailor.nick : v.other_nick));
   rgt.appendChild(el("div","pt", v.b_port));
-  if(hourB!=null) rgt.appendChild(el("div","pt", fmtLocalHour(hourB)+(v.side==="B"?"":" 쯤"))).style.color="#9c8bad";
+  if(hourB!=null) rgt.appendChild(el("div","pt", fmtLocalHour(hourB)+(v.side==="B"?"":"쯤"))).style.color="#9c8bad";
   ends.appendChild(rgt);
   b.appendChild(ends);
 
@@ -2079,7 +2079,7 @@ function viewVoyage(){
 
   if(isSeed){
     const k=el("div","keeper-badge");
-    k.innerHTML="<span>🫙</span><span><b>오래된 병편지예요.</b> 사람이 쓴 게 아니라, 이 바다를 만들 때 미리 띄워둔 편지입니다. 답장을 보내면 그 시간만큼 걸려 또 다른 편지가 돌아와요.</span>";
+    k.innerHTML="<span>🫙</span><span><b>오래된 병편지예요.</b> 사람이 쓴 게 아니라, 이 바다를 만들 때 미리 띄워 둔 편지예요. 답장을 보내면 그만큼의 시간이 걸려 또 다른 편지가 돌아와요.</span>";
     b.appendChild(k);
   }
 
@@ -2114,7 +2114,7 @@ function viewVoyage(){
     const note=el("p","muted","도착까지 약 "+fmtDur(v.leg_ms)+" 걸려요.");
     b.appendChild(note);
     const ta=document.createElement("textarea");
-    ta.maxLength=MAX_LEN; ta.placeholder="읽었다는 것만 전해도 충분합니다.";
+    ta.maxLength=MAX_LEN; ta.placeholder="읽었다는 말만 전해도 충분해요.";
     ta.setAttribute("aria-label","답장 내용");
     b.appendChild(ta);
     const clearDraft=bindDraft(ta,v.id);
@@ -2125,7 +2125,7 @@ function viewVoyage(){
     if(v.side==="B" && !letters.some(L=>L.mine) && !v.other_closed){
       const rel=el("button","btn ghost","다시 바다로");
       rel.onclick=async()=>{
-        if(!confirm("답장하지 않고 돌려보낼까요? 다른 사람이 주울 수 있게 됩니다.")) return;
+        if(!confirm("답장하지 않고 돌려보낼까요? 다른 사람이 주울 수 있게 돼요.")) return;
         rel.disabled=true;
         try{ await rpc("dp_release",{p_voyage:v.id}); clearDraft(); await refresh(); go("home"); toast("다시 바다로 보냈어요."); }
         catch(e){ rel.disabled=false; toast(errMsg(e),true); }
@@ -2156,11 +2156,11 @@ function viewVoyage(){
     };
     ta.addEventListener("input",upd); upd();
   }else if(g.code==="ended"){
-    b.appendChild(el("p","lede","상대가 이 편지를 접었습니다. 더 보낼 수는 없지만, 오간 편지는 남아요."));
+    b.appendChild(el("p","lede","상대가 이 편지를 접었어요. 더 보낼 수는 없지만, 주고받은 편지는 남아요."));
   }else if(g.code==="waiting"){
     b.appendChild(el("p","lede", v.side==="A"
-      ? "편지는 전해졌습니다. 답장이 올지는 그 사람의 몫이에요."
-      : "답장을 보냈습니다. 이제 기다리는 일만 남았어요."));
+      ? "편지는 전해졌어요. 답장이 올지는 그 사람의 몫이에요."
+      : "답장을 보냈어요. 이제 기다리는 일만 남았어요."));
   }
 
   const shareRow=el("div","row");
@@ -2178,15 +2178,15 @@ function viewVoyage(){
     rep.onclick=async()=>{
       const why=prompt("어떤 점이 문제였는지 짧게 알려주세요.");
       if(why===null) return;
-      try{ await rpc("dp_report_voyage",{p_voyage:v.id,p_reason:why}); toast("접수했습니다."); }
+      try{ await rpc("dp_report_voyage",{p_voyage:v.id,p_reason:why}); toast("접수했어요."); }
       catch(e){ toast(errMsg(e),true); }
     };
     foot.appendChild(rep);
   }
   const fin=el("button","btn ghost tiny", g.code==="ended" ? "접어서 자리 비우기" : "이 편지 접기");
   fin.onclick=async()=>{
-    if(!confirm("이 편지를 접을까요? 지난 편지함에 남고, 자리가 비워집니다.")) return;
-    try{ await rpc("dp_close",{p_voyage:v.id}); await refresh(); go("home"); toast("접었습니다."); }
+    if(!confirm("이 편지를 접을까요? 지난 편지함에 남고, 새 배를 띄울 수 있게 돼요.")) return;
+    try{ await rpc("dp_close",{p_voyage:v.id}); await refresh(); go("home"); toast("접었어요."); }
     catch(e){ toast(errMsg(e),true); }
   };
   foot.appendChild(fin);
@@ -2203,7 +2203,7 @@ function viewKey(){
   dock.hidden=true; ctx.showBoat=true; Ocean.setFar(0);
   const k=ctx.key||load(LS.key,"");
   const b=el("div","col");
-  b.appendChild(el("p","lede","편지는 며칠씩 걸립니다. 그동안 다른 기기에서 열거나 브라우저를 정리하면, 이 열쇠 없이는 이어갈 수 없어요."));
+  b.appendChild(el("p","lede","편지는 며칠씩 걸려요. 그동안 다른 기기에서 열거나 브라우저를 정리하면, 이 열쇠 없이는 이어갈 수 없어요."));
 
   const box=el("div","keybox",k||"—");
   box.setAttribute("role","text");
@@ -2213,16 +2213,16 @@ function viewKey(){
   const c1=el("button","btn ghost","열쇠 복사");
   c1.onclick=async()=>{ toast(await copyText(k) ? "복사했어요." : "복사가 막혀 있어요. 길게 눌러 복사해 주세요.", false); };
   const c2=el("button","btn ghost","이어가기 링크 복사");
-  c2.onclick=async()=>{ toast(await copyText(keyLink(k)) ? "링크를 복사했어요. 다른 기기에서 열면 이어집니다." : "복사가 막혀 있어요.", false); };
+  c2.onclick=async()=>{ toast(await copyText(keyLink(k)) ? "링크를 복사했어요. 다른 기기에서 열면 이어져요." : "복사가 막혀 있어요.", false); };
   row.appendChild(c1); row.appendChild(c2);
   b.appendChild(row);
 
   const f=document.createElement("details"); f.className="fold";
   f.innerHTML=`<summary>이게 왜 필요한가요</summary>
-    <div class="in"><p>로그인이 없어서, 지금은 <b>이 브라우저</b>가 곧 당신입니다.</p>
-    <p>폰과 노트북을 오가거나, 방문 기록을 지우거나, 시크릿 창을 쓰면 다른 사람이 됩니다.
-    띄운 배도 오던 답장도 그때 끊겨요. 이 열쇠는 그걸 잇는 유일한 방법입니다.</p>
-    <p>서버에는 이 열쇠의 <b>지문(해시)</b>만 남습니다. 잃어버리면 저희도 되찾아 드릴 수 없어요.</p></div>`;
+    <div class="in"><p>로그인이 없어서, 지금은 <b>이 브라우저</b>가 곧 당신이에요.</p>
+    <p>폰과 노트북을 오가거나, 방문 기록을 지우거나, 시크릿 창을 쓰면 다른 사람이 돼요.
+    띄운 배도 오던 답장도 그때 끊겨요. 이 열쇠가 그걸 잇는 유일한 방법이에요.</p>
+    <p>서버에는 이 열쇠의 <b>지문(해시)</b>만 남아요. 잃어버리면 저희도 되찾아 드릴 수 없어요.</p></div>`;
   b.appendChild(f);
 
   const foot=el("div","row end");
@@ -2237,7 +2237,7 @@ function viewClaim(){
   dock.hidden=true; ctx.showBoat=true; Ocean.setFar(0);
   const b=el("div","col");
   b.innerHTML=`<h1 class="title" style="font-size:clamp(19px,4.2vw,25px)">이어가기</h1>
-    <p class="lede">전에 쓰던 열쇠를 넣어주세요. 띄운 배와 주고받던 편지가 그대로 돌아옵니다.</p>`;
+    <p class="lede">전에 쓰던 열쇠를 넣어 주세요. 띄운 배와 주고받던 편지가 그대로 돌아와요.</p>`;
   const inp=document.createElement("input");
   inp.type="text"; inp.placeholder="조약돌-노을-밀물-종이배-473";
   inp.setAttribute("aria-label","이어가기 열쇠");
@@ -2261,7 +2261,7 @@ function viewClaim(){
       if(r && r.port) store(LS.port,r.port);
       await refresh();
       go("home");
-      toast((r&&r.nick? r.nick+" · ":"")+"이어졌습니다.");
+      toast((r&&r.nick? r.nick+" · ":"")+"이어졌어요.");
     }catch(e){
       ok.disabled=false; ok.textContent="이어가기";
       msg.textContent=errMsg(e);
@@ -2285,12 +2285,12 @@ async function viewLog(){
   row.appendChild(back); b.appendChild(row);
   show(win("지난 편지", b));
 
-  if(!hasSession){ list.innerHTML=""; list.appendChild(el("p","lede","아직 아무것도 없습니다.")); return; }
+  if(!hasSession){ list.innerHTML=""; list.appendChild(el("p","lede","아직 아무것도 없어요.")); return; }
   try{
     const items=await rpc("dp_logbook");
     list.innerHTML="";
     if(!items||!items.length){
-      list.appendChild(el("p","lede","아직 접어둔 편지가 없습니다."));
+      list.appendChild(el("p","lede","아직 접어 둔 편지가 없어요."));
       return;
     }
     /* 소인첩 — 받은 편지가 있는 항해마다 소인 하나 */
@@ -2344,33 +2344,33 @@ async function viewLog(){
 function viewAbout(){
   dock.hidden=true; ctx.showBoat=true; Ocean.setFar(0);
   const b=el("div","col");
-  b.appendChild(el("p","lede","접은 종이배에 편지를 실어 띄웁니다. 낯선 누군가가 그걸 줍고, 답장은 진짜 배가 오는 시간만큼 걸려 도착해요."));
+  b.appendChild(el("p","lede","접은 종이배에 편지를 실어 띄워요. 낯선 누군가가 그걸 줍고, 답장은 진짜 배가 건너오는 시간만큼 걸려 도착해요."));
 
   const folds=[
     ["편지는 진짜 배의 속도로 갑니다",
-     "<p>시속 <b>37km</b>(20노트), 화물선의 순항 속도입니다. 하루에 약 889km.</p>"+
+     "<p>시속 <b>37km</b>(20노트), 화물선이 바다를 건너는 속도예요. 하루에 약 889km.</p>"+
      "<p>서울에서 도쿄까지 약 하루 반, 서울에서 뉴욕까지 약 열이틀이 걸려요.</p>"],
-    ["그래서 줍는 것도 거리를 따릅니다",
-     "<p>띄운 배는 시간이 갈수록 넓게 퍼집니다. 아직 당신에게 닿지 못한 배는 주울 수 없어요.</p>"+
-     "<p>먼 나라의 편지는 며칠을 기다려야 만납니다.</p>"],
+    ["그래서 줍는 데도 시간이 걸립니다",
+     "<p>띄운 배는 시간이 갈수록 멀리 나아가요. 아직 당신 바다까지 오지 못한 배는 주울 수 없어요.</p>"+
+     "<p>먼 나라의 편지는 며칠을 기다려야 만나요.</p>"],
     ["한 번에 한 척",
-     "<p>띄우는 배도 한 척, 줍는 배도 한 척입니다. 편지를 접어야 다음 배를 띄울 수 있어요.</p>"],
+     "<p>띄우는 배도 한 척, 줍는 배도 한 척이에요. 편지를 접어야 다음 배를 띄울 수 있어요.</p>"],
     ["도착 전에는 아무도 못 읽습니다",
-     "<p>항해 중인 편지의 내용은 서버가 내어주지 않습니다. 기다림을 건너뛸 방법은 없어요.</p>"],
+     "<p>바다 위에 있는 편지의 내용은 서버가 내어 주지 않아요. 기다림을 건너뛸 방법은 없어요.</p>"],
     ["우리가 모르는 것",
-     "<p>로그인이 없습니다. 이름·이메일·전화번호를 묻지 않아요. 브라우저에 열쇠 하나가 저장되고, 그것으로 당신을 기억합니다.</p>"+
-     "<p>위치는 약 <b>25km 격자</b>로 반올림해서 저장합니다. 화면에는 가장 가까운 바다 이름만 나오고, "+
-     "편지를 주고받는 상대에게는 지도를 그리기 위해 <b>1도(약 111km) 단위로 더 뭉갠 좌표</b>가 전달돼요.</p>"+
-     "<p>브라우저 저장소를 지우면 지금까지의 편지도 함께 사라집니다.</p>"],
+     "<p>로그인이 없어요. 이름·이메일·전화번호를 묻지 않아요. 브라우저에 열쇠 하나가 저장되고, 그걸로 당신을 기억해요.</p>"+
+     "<p>위치는 약 <b>25km 격자</b>로 반올림해서 저장해요. 화면에는 가장 가까운 바다 이름만 나오고, "+
+     "편지를 주고받는 상대에게는 지도를 그리기 위해 <b>1도(약 111km) 단위로 더 흐리게 만든 좌표</b>만 전달돼요.</p>"+
+     "<p>브라우저 저장소를 지우면 지금까지의 편지도 함께 사라져요. 이어가기 열쇠를 적어 두면 돌아올 수 있어요.</p>"],
     ["부탁",
-     "<p>편지에 개인정보를 적지 말아 주세요. 모르는 사이라서 지킬 수 있는 것들이 있습니다.</p>"+
-     "<p>불쾌한 편지는 <b>신고</b>하고 <b>다시 바다로</b> 보내면, <b>그 배</b>는 다시 당신에게 오지 않습니다. "+
+     "<p>편지에 개인정보를 적지 말아 주세요. 모르는 사이라서 지킬 수 있는 것들이 있어요.</p>"+
+     "<p>불쾌한 편지는 <b>신고</b>하고 <b>다시 바다로</b> 보내면, <b>그 배</b>는 다시 당신에게 오지 않아요. "+
      "다만 같은 사람이 나중에 띄운 다른 배까지 막지는 못해요.</p>"+
-     "<p>아무도 줍지 않은 배는 30일 뒤 가라앉습니다.</p>"],
+     "<p>아무도 줍지 않은 배는 30일 뒤 가라앉아요.</p>"],
     ["오래된 병편지",
-     "<p>바다가 비어 있을 때, 세계 곳곳에서 미리 띄워둔 편지를 만날 수 있습니다.</p>"+
-     "<p>사람이 쓴 게 아니라 <b>이 바다를 만들 때 써 둔 편지</b>이고, 만날 때마다 그렇게 표시됩니다. "+
-     "사람이 띄운 배는 언제나 먼저 발견돼요.</p>"],
+     "<p>바다가 비어 있을 때는 세계 곳곳에 미리 띄워 둔 편지를 만나게 돼요.</p>"+
+     "<p>사람이 쓴 게 아니라 <b>이 바다를 만들 때 써 둔 편지</b>이고, 만날 때마다 그렇게 표시돼요. "+
+     "사람이 띄운 배가 언제나 먼저 발견돼요.</p>"],
   ];
   folds.forEach(([t,html])=>{
     const d=document.createElement("details"); d.className="fold";
@@ -2385,7 +2385,7 @@ function viewAbout(){
     row.appendChild(keyb);
     const again=el("button","btn ghost tiny","자리 옮기기");
     again.onclick=()=>{
-      if(!confirm("자리를 옮기면 앞으로의 편지는 새 자리를 기준으로 항해합니다. 진행 중인 편지는 그대로예요.")) return;
+      if(!confirm("자리를 옮기면 앞으로 띄우는 편지는 새 자리에서 출발해요. 지금 오가는 편지는 그대로예요.")) return;
       go("port");
     };
     row.appendChild(again);
@@ -2404,7 +2404,7 @@ function viewFatal(msg){
   b.innerHTML=`<div class="label">OFFLINE</div>
     <h1 class="title" style="font-size:clamp(20px,4.4vw,26px)">바다에 닿지 못했어요</h1>
     <p class="lede">${esc(msg)}</p>
-    <p class="muted">잠시 뒤 새로고침하면 대개 돌아옵니다.</p>`;
+    <p class="muted">잠시 뒤 새로고침하면 보통 돌아와요.</p>`;
   const r=el("div","row"); const rb=el("button","btn primary","다시 시도");
   rb.onclick=()=>location.reload(); r.appendChild(rb); b.appendChild(r);
   show(win("연결 · CONNECTION", b));
@@ -2448,7 +2448,7 @@ function tick(){
   if(eta && ctx._chart && ctx._chart.g && ctx._chart.g.at){
     const g=ctx._chart.g;
     const left=g.at-now();
-    eta.textContent = left>0 ? fmtDur(left)+" 남음" : "곧 도착합니다";
+    eta.textContent = left>0 ? fmtDur(left)+" 남음" : "곧 도착해요";
     const total=Math.max(1,g.at-g.from);
     const p=clamp((now()-g.from)/total,0,1);
     const fill=$(".gauge i"), knob=$(".gauge b");
@@ -2615,7 +2615,7 @@ async function takeLinkKey(){
     if(r&&r.port) store(LS.port,r.port);
     await refresh();
     go("home");
-    toast((r&&r.nick? r.nick+" · ":"")+"이어졌습니다.");
+    toast((r&&r.nick? r.nick+" · ":"")+"이어졌어요.");
   }catch(e){
     store(LS.seen,"1");
     go("claim",{code:code, back:"intro"});
