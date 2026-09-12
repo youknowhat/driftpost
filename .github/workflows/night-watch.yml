@@ -1,0 +1,19 @@
+# 야간 순찰 — 하루 한 번 바다를 돌본다.
+# Supabase 무료 플랜은 7일 동안 DB 를 건드리지 않으면 프로젝트를 정지시킨다.
+# 이 호출이 그 심장박동이다. 공개 키만 쓰고, 함수 안에서 20시간에 한 번만 실제로 돈다.
+name: night-watch
+on:
+  schedule:
+    - cron: '7 12 * * *'      # 매일 21:07 KST
+  workflow_dispatch:
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: dp_night_watch
+        run: |
+          curl -sS --fail -X POST \
+            "https://blhwgdiuxdzngepotseo.supabase.co/rest/v1/rpc/dp_night_watch" \
+            -H "apikey: sb_publishable_NgVHDq30C1pVI10Rp8seVQ_XDwcxtNh" \
+            -H "Authorization: Bearer sb_publishable_NgVHDq30C1pVI10Rp8seVQ_XDwcxtNh" \
+            -H "Content-Type: application/json" -d '{}'
