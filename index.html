@@ -1202,6 +1202,7 @@ const ERRS={
   "moved too soon":"자리는 한 시간에 한 번만 옮길 수 있어요.",
   "device busy":"이 브라우저에 이미 진행 중인 편지가 있어요. 그 편지를 접은 뒤에 이어가 주세요.",
   "too many tries":"열쇠를 너무 여러 번 넣었어요. 한 시간 뒤에 다시 시도해 주세요.",
+  "anchored":"이 자리에서 띄운 편지에 신고가 여러 번 들어왔어요. 일주일 동안은 배를 띄울 수 없어요.",
   "bad body":"편지는 500자까지 쓸 수 있어요."
 };
 function errMsg(e){
@@ -1284,8 +1285,8 @@ function viewIntro(){
   })();
 
   const row=el("div","row");
-  const go1=el("button","btn primary","바다로 나가기");
-  go1.onclick=async()=>{ await Sea.toggle(true); startPort(); };
+  const go1=el("button","btn primary","편지 써 보기");
+  go1.onclick=async()=>{ await Sea.toggle(true); go("compose"); };
   const q=el("button","btn ghost","어떻게 되는 건가요");
   q.onclick=()=>go("about",{back:"intro"});
   row.appendChild(go1); row.appendChild(q);
@@ -1305,7 +1306,7 @@ function viewPort(){
   const b=el("div","col");
   b.innerHTML=`
     <h1 class="title" style="font-size:clamp(20px,4.4vw,27px)">어느 바다 앞에 서 있나요?</h1>
-    <p class="lede">편지가 바다를 건너는 시간을 재야 해서, 어디쯤인지만 알려 주세요.</p>`;
+    <p class="lede">${ctx.then==="launch" ? "편지는 다 썼어요. 띄우기 전에, " : ""}편지가 바다를 건너는 시간을 재야 해서, 어디쯤인지만 알려 주세요.</p>`;
 
   const status=el("p","muted"); status.style.minHeight="20px";
 
@@ -1367,7 +1368,7 @@ function viewPort(){
   }
   paint(""); search.oninput=()=>paint(search.value);
 
-  function pick(la,lo){ go("nick",{lat:la,lng:lo,port:portLabel(la,lo)}); }
+  function pick(la,lo){ go("nick",{lat:la,lng:lo,port:portLabel(la,lo),then:ctx.then}); }
   show(win("어디쯤인가요", b));
 }
 
@@ -1396,10 +1397,21 @@ function viewNick(){
     try{
       await ensureSession();
       await rpc("dp_register",{p_nick:nick,p_lat:ctx.lat,p_lng:ctx.lng,p_port:ctx.port});
-      const label=ctx.port;
+      const label=ctx.port, then=ctx.then;
       store(LS.nick,nick); store(LS.port,label);
       const k=await ensureKey();
       await refresh();
+      // 편지를 먼저 써 두고 왔다면, 자리를 정한 김에 바로 띄운다
+      const draft=load(draftKey("new"),"");
+      if(then==="launch" && draft.trim()){
+        try{
+          await rpc("dp_launch",{p_body:draft.trim()});
+          store(draftKey("new"),undefined); Sea.paper();
+          await refresh();
+          await cine("depart","둥실…", 5200);
+          go("key",{key:k, first:true, then:"launched"}); return;
+        }catch(e){ toast(errMsg(e),true); }
+      }
       go("key",{key:k, first:true});
     }catch(e){ ok.disabled=false; ok.textContent="여기서 시작하기"; toast(errMsg(e),true); }
   };
@@ -1620,10 +1632,12 @@ function viewCompose(){
   b.appendChild(f2);
 
   const row=el("div","row end");
-  const back=el("button","btn ghost","돌아가기"); back.onclick=()=>go("home");
+  const back=el("button","btn ghost","돌아가기"); back.onclick=()=>go(board&&board.registered?"home":"intro");
   const send=el("button","btn primary","바다에 띄우기"); send.disabled=true;
   send.onclick=async()=>{
     const body=ta.value.trim(); if(!body || send.dataset.busy) return;
+    // 아직 자리를 안 정했으면, 초안을 들고 자리부터 정하러 간다
+    if(!(board&&board.registered)){ store(draftKey("new"),body); go("port",{then:"launch"}); return; }
     send.dataset.busy="1"; send.disabled=true; send.textContent="접는 중…";
     try{
       await rpc("dp_launch",{p_body:body});
@@ -2116,6 +2130,13 @@ function viewVoyage(){
     const ta=document.createElement("textarea");
     ta.maxLength=MAX_LEN; ta.placeholder="읽었다는 말만 전해도 충분해요.";
     ta.setAttribute("aria-label","답장 내용");
+    /* 쓸 말이 없는 날을 위해 — 한 줄짜리 도장. 그래도 배를 타고 똑같이 항해한다. */
+    const stamps=el("div","seed-chips");
+    ["잘 읽었어요.","나도 그래요.","여기까지 오느라 고생했어요.","괜찮아질 거예요.","그랬군요."].forEach(x=>{
+      const c2=el("button",null,x); c2.onclick=()=>{ ta.value=x; ta.dispatchEvent(new Event("input",{bubbles:true})); ta.focus(); };
+      stamps.appendChild(c2);
+    });
+    b.appendChild(stamps);
     b.appendChild(ta);
     const clearDraft=bindDraft(ta,v.id);
     const mrow=el("div","row");
@@ -2176,10 +2197,13 @@ function viewVoyage(){
   if(!isSeed){
     const rep=el("button","btn ghost tiny","신고");
     rep.onclick=async()=>{
-      const why=prompt("어떤 점이 문제였는지 짧게 알려주세요.");
+      const why=prompt("어떤 점이 문제였는지 짧게 알려주세요. 이 편지는 바로 물에서 꺼내고, 당신 자리는 비워 드려요.");
       if(why===null) return;
-      try{ await rpc("dp_report_voyage",{p_voyage:v.id,p_reason:why}); toast("접수했어요."); }
-      catch(e){ toast(errMsg(e),true); }
+      try{
+        const r=await rpc("dp_report_voyage",{p_voyage:v.id,p_reason:why});
+        await refresh(); go("home");
+        toast(r&&r.held ? "그 편지는 물에서 꺼냈어요. 당신 자리는 비웠어요." : "접수했어요. 당신 자리는 비웠어요.");
+      }catch(e){ toast(errMsg(e),true); }
     };
     foot.appendChild(rep);
   }
@@ -2227,7 +2251,7 @@ function viewKey(){
 
   const foot=el("div","row end");
   const ok=el("button","btn primary", ctx.first ? "적어뒀어요" : "돌아가기");
-  ok.onclick=()=>{ if(ctx.first) go("home"); else goBack("about"); };
+  ok.onclick=()=>{ if(ctx.first) go(ctx.then||"home"); else goBack("about"); };
   foot.appendChild(ok); b.appendChild(foot);
   show(win("이어가기 열쇠", b, "panel-narrow"));
 }
@@ -2583,7 +2607,7 @@ async function boot(){
     if(!board.sailor.has_code || !load(LS.key,"")) { ensureKey().catch(()=>{}); }
     go("home");
   }else{
-    go(load(LS.seen,"")==="1" ? "port" : "intro");
+    go("intro");
   }
   store(LS.seen,"1");
 
